@@ -1,0 +1,26 @@
+{
+  "name": "@ai-tutor/agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "LiveKit agent worker: STT/LLM/TTS loop, VAD interruption throttle, shared-focus injection, context compaction.",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts dev",
+    "start": "tsx src/index.ts start",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@livekit/agents": "^1.6.4",
+    "@livekit/agents-plugin-deepgram": "^1.6.4",
+    "@livekit/agents-plugin-openai": "^1.6.4",
+    "@livekit/agents-plugin-cartesia": "^1.6.4",
+    "@livekit/agents-plugin-silero": "^1.6.4",
+    "@supabase/supabase-js": "^2.45.0",
+    "livekit-server-sdk": "^2.9.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.0"
+  }
+}
