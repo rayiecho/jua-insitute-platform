@@ -1,4 +1,5 @@
 import { supabase } from './supabase.js';
+import { embedText } from './embeddings.js';
 
 export interface OpeningContext {
   systemPrompt: string;
@@ -6,13 +7,16 @@ export interface OpeningContext {
 }
 
 // Section 4.4 — "Pick up where we left off". Runs once at session start, before
-// the tutor speaks. All three queries are independent so they run in parallel;
-// each is allowed to come back empty (first-ever session for this learner).
+// the tutor speaks. Memory search needs to know the current lesson first (it
+// searches *against* that), so curriculum context is fetched before it rather
+// than in the same parallel batch as the other two, independent, queries.
 export async function buildOpeningContext(learnerId: string): Promise<OpeningContext> {
-  const [progress, curriculumContext, memories] = await Promise.all([
+  const curriculumContext = await fetchCurrentCurriculumContext(learnerId);
+  const memoryQuery = curriculumContext?.nodeContent ?? curriculumContext?.nodeTitle ?? null;
+
+  const [progress, memories] = await Promise.all([
     fetchInProgressAssignment(learnerId),
-    fetchCurrentCurriculumContext(learnerId),
-    fetchRelevantMemories(learnerId),
+    fetchRelevantMemories(learnerId, memoryQuery),
   ]);
 
   const parts: string[] = [
@@ -114,16 +118,37 @@ async function fetchCurrentCurriculumContext(learnerId: string): Promise<Current
   };
 }
 
-async function fetchRelevantMemories(learnerId: string): Promise<string[]> {
-  // TODO(Phase 4): replace with an embedding similarity search
-  // (match against the current curriculum node's embedding via pgvector <->)
-  // once the embedding pipeline exists. For now, most-recent-N as a placeholder.
-  const { data } = await supabase
-    .from('lesson_memory_vectors')
-    .select('summary_text')
-    .eq('user_id', learnerId)
-    .order('created_at', { ascending: false })
-    .limit(5);
+async function fetchRelevantMemories(learnerId: string, queryText: string | null): Promise<string[]> {
+  // No curriculum context yet (learner hasn't enrolled/opened a lesson) —
+  // nothing sensible to search against, so just surface the most recent.
+  if (!queryText) {
+    const { data } = await supabase
+      .from('lesson_memory_vectors')
+      .select('summary_text')
+      .eq('user_id', learnerId)
+      .order('created_at', { ascending: false })
+      .limit(5);
+    return (data ?? []).map((row) => row.summary_text);
+  }
 
-  return (data ?? []).map((row) => row.summary_text);
+  try {
+    const queryEmbedding = await embedText(queryText);
+    const { data, error } = await supabase.rpc('match_lesson_memories', {
+      query_embedding: queryEmbedding,
+      match_user_id: learnerId,
+      match_count: 5,
+    });
+    if (error) throw error;
+    return (data ?? []).map((row: { summary_text: string }) => row.summary_text);
+  } catch {
+    // Embedding model not ready yet / RPC unavailable — fall back rather than
+    // open with no memory at all.
+    const { data } = await supabase
+      .from('lesson_memory_vectors')
+      .select('summary_text')
+      .eq('user_id', learnerId)
+      .order('created_at', { ascending: false })
+      .limit(5);
+    return (data ?? []).map((row) => row.summary_text);
+  }
 }

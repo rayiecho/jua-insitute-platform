@@ -7,7 +7,6 @@ import {
   cli,
   defineAgent,
   voice,
-  inference,
   AgentSessionEventTypes,
 } from '@livekit/agents';
 import * as openai from '@livekit/agents-plugin-openai';
@@ -18,6 +17,7 @@ import { buildOpeningContext } from './continuity.js';
 import { StateInjector } from './state-injection.js';
 import { CompactionManager } from './compaction.js';
 import { logConnectionEvent } from './supabase.js';
+import { logSessionUsage } from './cost-tracking.js';
 
 // Section 4.1 / 4.2 / 4.3 of platform-technical-specification-mvp.md drive the
 // shape of this worker. Each numbered section below maps to one behavior
@@ -37,15 +37,16 @@ export default defineAgent({
     const llm = openai.LLM.withGroq({ model: 'openai/gpt-oss-20b' });
 
     const session = new voice.AgentSession({
-      // TEMPORARY (network diagnosis): this network has flaky routing specifically to
-      // Deepgram's servers (confirmed via repeated raw WebSocket tests — reliable to
-      // LiveKit and generic WSS endpoints, consistently fails to Deepgram directly).
-      // Routing STT through LiveKit's own inference gateway means this machine only
-      // ever talks to LiveKit (proven reliable); LiveKit Cloud calls Deepgram
-      // server-side instead. Swap back to `new deepgram.STT({ model: 'nova-2',
-      // language: 'en' })` (@livekit/agents-plugin-deepgram) if/when direct
-      // connectivity to Deepgram stops being a problem.
-      stt: new inference.STT({ model: 'deepgram/nova-2', language: 'en' }),
+      // Direct Deepgram STT. Previously routed through LiveKit's inference gateway
+      // because this network (a dev machine on a "small"/mobile connection) had
+      // flaky routing specifically to Deepgram's WebSocket endpoint — confirmed via
+      // repeated raw WebSocket tests at the time. The agent worker now runs on
+      // Railway (2026-08-17), which has clean connectivity, so that workaround's
+      // reason no longer applies here; TTS already reuses this same Deepgram
+      // account/key successfully in production. If STT errors start showing up in
+      // `railway logs`, that's the signal to revert to
+      // `new inference.STT({ model: 'deepgram/nova-2', language: 'en' })`.
+      stt: new deepgram.STT({ model: 'nova-2', language: 'en' }),
       // TEMPORARY (smoke test): OpenAI billing is blocked, so this runs on Groq's
       // free tier via the OpenAI plugin's built-in Groq adapter (same plugin, just a
       // different backend — no separate @livekit/agents-plugin-groq needed). Reads
@@ -74,7 +75,8 @@ export default defineAgent({
     });
 
     const stateInjector = new StateInjector(session, learnerId); // Section 4.1 — shared focus
-    const compaction = new CompactionManager(session, ctx.room.name ?? 'unknown-room', llm); // Section 4.3
+    const compaction = new CompactionManager(session, ctx.room.name ?? 'unknown-room', llm, learnerId); // Section 4.3
+    const sessionStartedAt = Date.now(); // Section 5/6 — cost monitoring
 
     // Section 4.2 — interruption must be a server-side event, not client-triggered, so it
     // survives mobile network jitter. AgentSession's own VAD-mode interruption (configured
@@ -87,6 +89,7 @@ export default defineAgent({
     session.on(AgentSessionEventTypes.Close, () => {
       stateInjector.dispose();
       compaction.dispose();
+      void logSessionUsage(session, ctx.room.name ?? 'unknown-room', sessionStartedAt);
     });
 
     await session.start({
