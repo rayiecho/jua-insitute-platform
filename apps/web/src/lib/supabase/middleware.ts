@@ -7,19 +7,18 @@ const NEXT_COOKIE = 'auth_next';
 // Components can't write cookies themselves (Next.js restriction), so
 // without this, sessions would silently expire instead of auto-refreshing.
 //
-// ALSO handles the magic-link/OAuth code exchange here rather than only in
-// /auth/callback. Confirmed live (2026-08-18): even with Site URL and a
-// correctly wildcarded Redirect URL configured in Supabase, the actual
-// email link that gets sent truncates whatever path/query we request down
-// to the bare origin — so `?code=...` can land on any page, not reliably
-// on /auth/callback, and any `next` destination we tried to pass via the
-// URL was silently dropped by Supabase before it ever reached us. Handling
-// "there's a code in the URL" in middleware means it gets exchanged no
-// matter where it lands, and `next` survives because it's stashed in a
-// cookie (set by EmailAuthForm before redirecting to Supabase) instead of
-// relying on Supabase to round-trip a query param it doesn't preserve.
+// Also handles a PKCE-style `?code=` redirect, if one ever shows up — kept
+// as a defensive fallback even though a live test (2026-08-18) showed this
+// project's Supabase auth actually uses the *implicit* flow (session
+// tokens arrive as a URL fragment, #access_token=..., which servers can
+// never see — browsers strip fragments before the HTTP request goes out).
+// That real case is handled client-side instead, in
+// components/auth/AuthHashHandler.tsx (mounted globally in the root
+// layout), which is the only place capable of reading window.location.hash.
+// Both paths read/clear the same `auth_next` cookie so `next` survives
+// regardless of which flow actually fires.
 export async function updateSession(request: NextRequest) {
-  let response = NextResponse.next({ request });
+  const response = NextResponse.next({ request });
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -30,11 +29,8 @@ export async function updateSession(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          for (const { name, value } of cookiesToSet) {
-            request.cookies.set(name, value);
-          }
-          response = NextResponse.next({ request });
           for (const { name, value, options } of cookiesToSet) {
+            request.cookies.set(name, value);
             response.cookies.set(name, value, options);
           }
         },
@@ -49,10 +45,8 @@ export async function updateSession(request: NextRequest) {
 
     const redirectUrl = new URL(error ? '/' : next, request.url);
     const redirectResponse = NextResponse.redirect(redirectUrl);
-    // Carry over the session cookies exchangeCodeForSession just wrote via
-    // setAll (onto `response`) — a fresh redirect response starts with none.
-    for (const cookie of response.cookies.getAll()) {
-      redirectResponse.cookies.set(cookie);
+    for (const setCookieValue of response.headers.getSetCookie()) {
+      redirectResponse.headers.append('Set-Cookie', setCookieValue);
     }
     redirectResponse.cookies.delete(NEXT_COOKIE);
     return redirectResponse;
