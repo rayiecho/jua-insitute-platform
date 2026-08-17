@@ -1,3 +1,5 @@
+import './env.js';
+
 import { fileURLToPath } from 'node:url';
 import {
   type JobContext,
@@ -32,7 +34,12 @@ export default defineAgent({
 
     const session = new voice.AgentSession({
       stt: new deepgram.STT({ model: 'nova-2', language: 'en' }),
-      llm: new openai.LLM({ model: 'gpt-4o-mini' }),
+      // TEMPORARY (smoke test): OpenAI billing is blocked, so this runs on Groq's
+      // free tier via the OpenAI plugin's built-in Groq adapter (same plugin, just a
+      // different backend — no separate @livekit/agents-plugin-groq needed). Reads
+      // GROQ_API_KEY from env. Swap back to `new openai.LLM({ model: 'gpt-4o-mini' })`
+      // per Section 2 of the spec once OpenAI billing is sorted.
+      llm: openai.LLM.withGroq({ model: 'llama-3.3-70b-versatile' }),
       tts: new cartesia.TTS({
         model: 'sonic-3',
         voice: process.env.CARTESIA_VOICE_ID ?? '',
