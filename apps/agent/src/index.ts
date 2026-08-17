@@ -11,7 +11,7 @@ import {
   AgentSessionEventTypes,
 } from '@livekit/agents';
 import * as openai from '@livekit/agents-plugin-openai';
-import * as cartesia from '@livekit/agents-plugin-cartesia';
+import * as deepgram from '@livekit/agents-plugin-deepgram';
 import * as silero from '@livekit/agents-plugin-silero';
 
 import { buildOpeningContext } from './continuity.js';
@@ -54,10 +54,15 @@ export default defineAgent({
       // enough). Groq's available model lineup changes often — recheck against
       // https://api.groq.com/openai/v1/models if this 404s again later.
       llm: openai.LLM.withGroq({ model: 'openai/gpt-oss-20b' }),
-      tts: new cartesia.TTS({
-        model: 'sonic-3',
-        voice: process.env.CARTESIA_VOICE_ID ?? '',
-      }),
+      // TEMPORARY (cost): Cartesia's free tier (20K credits/month) was exhausted almost
+      // immediately by real testing, and even the $5/mo Pro tier's 100K credits would
+      // likely go the same way. Deepgram — already in use for STT — also does TTS
+      // (Aura), confirmed working with real audio against the same account/key already
+      // in .env, so this reuses an existing vendor relationship instead of adding a new
+      // one. Swap back to `new cartesia.TTS({ model: 'sonic-3', voice: process.env.CARTESIA_VOICE_ID })`
+      // (@livekit/agents-plugin-cartesia, still installed) if Cartesia's pricing becomes
+      // worth it later — e.g. for voice cloning, which Deepgram's Aura voices don't do.
+      tts: new deepgram.TTS({ model: 'aura-2-asteria-en' }),
       vad: await silero.VAD.load(),
       turnHandling: {
         interruption: { mode: 'vad', enabled: true }, // Section 4.2 — VAD interruption throttle
