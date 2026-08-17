@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -19,20 +20,105 @@ const LESSON_TYPE_LABEL: Record<string, string> = {
 // but this project's Supabase instance has RLS on with no policies defined yet
 // (see packages/supabase/README.md) — the anon key can't read anything until
 // policies exist. Using the admin client here is the same pattern already used
-// by /api/learner and /api/livekit-token: trusted server-side code bypasses RLS
-// rather than the browser talking to Supabase directly with an anon key that
-// currently can't do anything.
+// elsewhere: trusted server-side code bypasses RLS rather than the browser
+// talking to Supabase directly with an anon key that currently can't do
+// anything.
 export default async function LessonPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const supabase = createAdminClient();
 
   const { data: node } = await supabase
     .from('curriculum_nodes')
-    .select('id, course_id, title, markdown_content, video_url, lesson_type')
+    .select('id, course_id, title, markdown_content, video_url, lesson_type, week_id')
     .eq('slug', slug)
     .maybeSingle();
 
   if (!node) notFound();
+
+  const [{ data: course }, { data: weeks }, { data: allNodes }] = await Promise.all([
+    supabase.from('courses').select('slug, title').eq('id', node.course_id).maybeSingle(),
+    supabase
+      .from('course_weeks')
+      .select('id, week_number, title, is_final_assessment')
+      .eq('course_id', node.course_id)
+      .order('week_number', { ascending: true }),
+    supabase
+      .from('curriculum_nodes')
+      .select('id, title, slug, sequence_order, week_id, lesson_type')
+      .eq('course_id', node.course_id),
+  ]);
+
+  // Flatten into course order (week_number, then sequence_order within the
+  // week) so Previous/Next can cross week boundaries seamlessly.
+  const weekOrder = new Map((weeks ?? []).map((w, i) => [w.id, i]));
+  const flat = [...(allNodes ?? [])].sort((a, b) => {
+    const wa = a.week_id ? (weekOrder.get(a.week_id) ?? 999) : 999;
+    const wb = b.week_id ? (weekOrder.get(b.week_id) ?? 999) : 999;
+    if (wa !== wb) return wa - wb;
+    return a.sequence_order - b.sequence_order;
+  });
+  const currentIndex = flat.findIndex((n) => n.id === node.id);
+  const prevNode = currentIndex > 0 ? flat[currentIndex - 1] : null;
+  const nextNode = currentIndex >= 0 && currentIndex < flat.length - 1 ? flat[currentIndex + 1] : null;
+
+  const currentWeek = (weeks ?? []).find((w) => w.id === node.week_id) ?? null;
+  const weekNodes = currentWeek ? flat.filter((n) => n.week_id === currentWeek.id) : [];
+
+  const sidebar = (
+    <aside className="w-64 shrink-0">
+      {course?.slug && (
+        <Link href={`/programs/${course.slug}`} className="text-sm font-medium text-tan hover:text-ink">
+          ← {course.title}
+        </Link>
+      )}
+      {currentWeek && (
+        <>
+          <p className="mt-5 text-xs font-semibold uppercase tracking-wide text-ink/50">
+            {currentWeek.is_final_assessment ? 'Final' : `Week ${currentWeek.week_number}`}
+          </p>
+          <p className="mt-1 font-serif text-base font-semibold text-ink">{currentWeek.title}</p>
+          <nav className="mt-4 flex flex-col gap-1">
+            {weekNodes.map((n) => {
+              const isCurrent = n.id === node.id;
+              return (
+                <Link
+                  key={n.id}
+                  href={`/learn/${n.slug}`}
+                  className={`rounded px-3 py-2 text-sm ${
+                    isCurrent ? 'bg-gold/10 font-medium text-ink' : 'text-ink/60 hover:bg-card'
+                  }`}
+                >
+                  {n.title}
+                </Link>
+              );
+            })}
+          </nav>
+        </>
+      )}
+    </aside>
+  );
+
+  const lessonNav = (
+    <div className="mt-10 flex items-center justify-between border-t border-border pt-6">
+      {prevNode ? (
+        <Link href={`/learn/${prevNode.slug}`} className="text-sm font-medium text-ink/70 hover:text-ink">
+          ← {prevNode.title}
+        </Link>
+      ) : (
+        <span />
+      )}
+      {nextNode ? (
+        <Link
+          href={`/learn/${nextNode.slug}`}
+          className="rounded bg-gold px-5 py-2.5 text-sm font-semibold text-ink"
+        >
+          Next: {nextNode.title} →
+        </Link>
+      ) : (
+        <span />
+      )}
+    </div>
+  );
 
   if (node.lesson_type === 'quiz') {
     const { data: questions } = await supabase
@@ -45,8 +131,12 @@ export default async function LessonPage({ params }: { params: Promise<{ slug: s
       <>
         <SiteHeader />
         <LessonViewTracker courseId={node.course_id} nodeId={node.id} />
-        <main className="mx-auto w-full max-w-6xl px-6 py-10">
-          <QuizLesson title={node.title} questions={questions ?? []} />
+        <main className="mx-auto flex w-full max-w-6xl gap-10 px-6 py-10">
+          {sidebar}
+          <div className="min-w-0 flex-1">
+            <QuizLesson title={node.title} questions={questions ?? []} />
+            {lessonNav}
+          </div>
         </main>
       </>
     );
@@ -85,14 +175,26 @@ export default async function LessonPage({ params }: { params: Promise<{ slug: s
       <SiteHeader />
       <LessonViewTracker courseId={node.course_id} nodeId={node.id} />
       {assignment ? (
-        <main className="mx-auto grid w-full max-w-6xl grid-cols-1 gap-8 px-6 py-10 lg:grid-cols-2">
-          {article}
-          <div className="lg:sticky lg:top-10 lg:h-[calc(100vh-5rem)]">
-            <AssignmentPanel assignmentId={assignment.id} starterCode={assignment.starter_code ?? ''} />
+        <main className="mx-auto flex w-full max-w-7xl gap-10 px-6 py-10">
+          {sidebar}
+          <div className="grid min-w-0 flex-1 grid-cols-1 gap-8 xl:grid-cols-2">
+            <div>
+              {article}
+              {lessonNav}
+            </div>
+            <div className="xl:sticky xl:top-10 xl:h-[calc(100vh-5rem)]">
+              <AssignmentPanel assignmentId={assignment.id} starterCode={assignment.starter_code ?? ''} />
+            </div>
           </div>
         </main>
       ) : (
-        <main className="mx-auto w-full max-w-3xl px-6 py-10">{article}</main>
+        <main className="mx-auto flex w-full max-w-6xl gap-10 px-6 py-10">
+          {sidebar}
+          <div className="min-w-0 flex-1">
+            {article}
+            {lessonNav}
+          </div>
+        </main>
       )}
     </>
   );
