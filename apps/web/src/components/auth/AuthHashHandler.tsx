@@ -16,39 +16,54 @@ function deleteCookie(name: string) {
 }
 
 // Mounted globally (root layout) because the magic-link/Google redirect can
-// land on ANY page — confirmed live (2026-08-18) that Supabase always
-// truncates our requested redirect path down to the bare origin, so this
-// can't assume it's running on a dedicated callback route.
+// land on ANY page — Supabase always truncates our requested redirect path
+// down to the bare origin, so this can't assume it's running on a dedicated
+// callback route.
 //
 // The session tokens arrive as a URL FRAGMENT (#access_token=...), not a
-// ?code= query param — this project's Supabase auth uses the implicit
-// flow, not PKCE. Fragments are never sent to the server (browsers strip
-// them before the HTTP request even goes out), so middleware genuinely
-// cannot see this — it has to be handled client-side. Just instantiating
-// the Supabase browser client is enough to trigger @supabase/ssr's
-// built-in hash detection, which both establishes the session and syncs it
-// into cookies for the server to see on the next request. This component's
-// only real job is: once that's happened, clean the fragment out of the
-// URL and send the user wherever `next` (stashed in a cookie by
-// EmailAuthForm before redirecting to Supabase) says they were headed.
+// ?code= query param — this project's Supabase auth uses the implicit flow.
+//
+// This can't rely on @supabase/ssr's built-in detectSessionInUrl: its
+// createBrowserClient hardcodes flowType: "pkce" (confirmed by reading
+// node_modules/@supabase/ssr — it's set *after* the options spread, so it
+// cannot be overridden). Internally, GoTrueClient._getSessionFromURL()
+// compares the URL's actual shape against `this.flowType`, and since our
+// hash is an implicit-grant URL while the client is forced into "pkce", it
+// throws AuthPKCEGrantCodeExchangeError('Not a valid PKCE flow url.') and
+// silently gives up — no session is ever created, so SIGNED_IN never fires.
+// This is why the previous version of this component (which just
+// instantiated the client and waited on onAuthStateChange) never worked.
+//
+// The real fix: parse the hash ourselves and hand the tokens to
+// setSession() directly, skipping the SDK's broken auto-detection.
 export function AuthHashHandler() {
   const router = useRouter();
 
   useEffect(() => {
     if (!window.location.hash.includes('access_token')) return;
 
+    const params = new URLSearchParams(window.location.hash.slice(1));
+    const access_token = params.get('access_token');
+    const refresh_token = params.get('refresh_token');
+    if (!access_token || !refresh_token) return;
+
     const supabase = createBrowserSupabaseClient();
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event) => {
-      if (event !== 'SIGNED_IN') return;
-      subscription.unsubscribe();
+
+    supabase.auth.setSession({ access_token, refresh_token }).then(({ error }) => {
+      // Strip the token fragment either way so it doesn't linger in the
+      // address bar or get shared/bookmarked.
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+
+      if (error) {
+        // eslint-disable-next-line no-console
+        console.error('Failed to establish session from magic link:', error);
+        return;
+      }
+
       const next = readCookie(NEXT_COOKIE) || '/';
       deleteCookie(NEXT_COOKIE);
       router.replace(next);
     });
-
-    return () => subscription.unsubscribe();
   }, [router]);
 
   return null;
