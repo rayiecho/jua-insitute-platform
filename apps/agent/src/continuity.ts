@@ -9,16 +9,25 @@ export interface OpeningContext {
 // the tutor speaks. All three queries are independent so they run in parallel;
 // each is allowed to come back empty (first-ever session for this learner).
 export async function buildOpeningContext(learnerId: string): Promise<OpeningContext> {
-  const [progress, lastSession, memories] = await Promise.all([
+  const [progress, curriculumContext, memories] = await Promise.all([
     fetchInProgressAssignment(learnerId),
-    fetchLastSessionSummary(learnerId),
+    fetchCurrentCurriculumContext(learnerId),
     fetchRelevantMemories(learnerId),
   ]);
 
   const parts: string[] = [
     'You are a 1-on-1 AI tutor picking up an ongoing relationship with this learner.',
   ];
-  if (lastSession) parts.push(`Last session summary: ${lastSession}`);
+  if (curriculumContext?.sessionSummary) {
+    parts.push(`Last session summary: ${curriculumContext.sessionSummary}`);
+  }
+  if (curriculumContext?.nodeTitle) {
+    parts.push(
+      `The learner's current curriculum lesson is "${curriculumContext.nodeTitle}"${
+        curriculumContext.assignmentTitle ? `, working on the assignment "${curriculumContext.assignmentTitle}"` : ''
+      }. Teach from this lesson unless the learner asks to move on.`,
+    );
+  }
   if (progress) {
     parts.push(
       `Current assignment in progress: "${progress.title}" (status: ${progress.grading_status}).`,
@@ -33,9 +42,11 @@ export async function buildOpeningContext(learnerId: string): Promise<OpeningCon
 
   return {
     systemPrompt: parts.join('\n\n'),
-    openingLine: lastSession
+    openingLine: curriculumContext?.sessionSummary
       ? 'Welcome the learner back and reference what they were working on last time.'
-      : 'Welcome the learner and ask what they would like to focus on first.',
+      : curriculumContext?.nodeTitle
+        ? `Welcome the learner and confirm you're picking up with "${curriculumContext.nodeTitle}".`
+        : 'Welcome the learner and ask what they would like to focus on first.',
   };
 }
 
@@ -54,17 +65,31 @@ async function fetchInProgressAssignment(learnerId: string) {
   return { title: assignment?.title ?? 'untitled assignment', grading_status: data.grading_status };
 }
 
-async function fetchLastSessionSummary(learnerId: string): Promise<string | null> {
+interface CurrentCurriculumContext {
+  sessionSummary: string | null;
+  nodeTitle: string | null;
+  assignmentTitle: string | null;
+}
+
+async function fetchCurrentCurriculumContext(learnerId: string): Promise<CurrentCurriculumContext | null> {
   const { data } = await supabase
     .from('session_curriculum_context')
-    .select('session_summary')
+    .select(
+      'session_summary, node:curriculum_nodes!active_node_id(title), assignment:course_assignments!active_assignment_id(title)',
+    )
     .eq('user_id', learnerId)
-    .not('session_summary', 'is', null)
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  return data?.session_summary ?? null;
+  if (!data) return null;
+  const node = Array.isArray(data.node) ? data.node[0] : data.node;
+  const assignment = Array.isArray(data.assignment) ? data.assignment[0] : data.assignment;
+  return {
+    sessionSummary: data.session_summary ?? null,
+    nodeTitle: node?.title ?? null,
+    assignmentTitle: assignment?.title ?? null,
+  };
 }
 
 async function fetchRelevantMemories(learnerId: string): Promise<string[]> {

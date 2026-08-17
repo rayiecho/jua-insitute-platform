@@ -1,9 +1,11 @@
 'use client';
 
 import '@livekit/components-styles';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { LiveKitRoom, RoomAudioRenderer } from '@livekit/components-react';
 import { TutorSessionUI } from './TutorSessionUI';
+import { LearnerGate } from '@/components/learner/LearnerGate';
+import type { Learner } from '@/lib/learner';
 
 interface ConnectionDetails {
   token: string;
@@ -11,57 +13,49 @@ interface ConnectionDetails {
 }
 
 export function TutorSessionRoom({ room }: { room: string }) {
+  return <LearnerGate>{(learner) => <Connector room={room} learner={learner} />}</LearnerGate>;
+}
+
+function Connector({ room, learner }: { room: string; learner: Learner }) {
   const [details, setDetails] = useState<ConnectionDetails | null>(null);
-  const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [connecting, setConnecting] = useState(false);
 
-  async function handleJoin(e: React.FormEvent) {
-    e.preventDefault();
-    const identity = name.trim();
-    if (!identity) return;
+  useEffect(() => {
+    let cancelled = false;
+    // Identity (learner.id) is a real platform_users UUID, not a free-text
+    // name — the agent uses it verbatim as user_id for continuity/state-
+    // injection queries (Section 4.4 / 4.1), so it has to be the real row id.
+    fetch(`/api/livekit-token?room=${encodeURIComponent(room)}&identity=${encodeURIComponent(learner.id)}`)
+      .then(async (res) => {
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error ?? `Failed to fetch session token (${res.status})`);
+        }
+        return res.json() as Promise<ConnectionDetails>;
+      })
+      .then((data) => {
+        if (!cancelled) setDetails(data);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to join session');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [room, learner.id]);
 
-    setConnecting(true);
-    setError(null);
-    try {
-      const res = await fetch(
-        `/api/livekit-token?room=${encodeURIComponent(room)}&identity=${encodeURIComponent(identity)}`,
-      );
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error ?? `Failed to fetch session token (${res.status})`);
-      }
-      const data = (await res.json()) as ConnectionDetails;
-      setDetails(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to join session');
-    } finally {
-      setConnecting(false);
-    }
+  if (error) {
+    return (
+      <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-4 px-6">
+        <p className="text-sm text-red-600">{error}</p>
+      </main>
+    );
   }
 
   if (!details) {
     return (
-      <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-4 px-6">
-        <h1 className="text-xl font-semibold">Join tutoring session</h1>
-        <p className="text-sm text-gray-500">Room: {room}</p>
-        <form onSubmit={handleJoin} className="flex flex-col gap-3">
-          <input
-            className="rounded border border-gray-300 px-3 py-2"
-            placeholder="Your name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            autoFocus
-          />
-          <button
-            type="submit"
-            disabled={connecting || !name.trim()}
-            className="rounded bg-black px-3 py-2 text-white disabled:opacity-50"
-          >
-            {connecting ? 'Joining…' : 'Join'}
-          </button>
-          {error && <p className="text-sm text-red-600">{error}</p>}
-        </form>
+      <main className="mx-auto flex min-h-screen max-w-sm flex-col items-center justify-center px-6">
+        <p className="text-sm text-gray-500">Joining as {learner.firstName}…</p>
       </main>
     );
   }
