@@ -7,9 +7,9 @@ import {
   cli,
   defineAgent,
   voice,
+  inference,
   AgentSessionEventTypes,
 } from '@livekit/agents';
-import * as deepgram from '@livekit/agents-plugin-deepgram';
 import * as openai from '@livekit/agents-plugin-openai';
 import * as cartesia from '@livekit/agents-plugin-cartesia';
 import * as silero from '@livekit/agents-plugin-silero';
@@ -33,13 +33,27 @@ export default defineAgent({
     const opening = await buildOpeningContext(learnerId); // Section 4.4
 
     const session = new voice.AgentSession({
-      stt: new deepgram.STT({ model: 'nova-2', language: 'en' }),
+      // TEMPORARY (network diagnosis): this network has flaky routing specifically to
+      // Deepgram's servers (confirmed via repeated raw WebSocket tests — reliable to
+      // LiveKit and generic WSS endpoints, consistently fails to Deepgram directly).
+      // Routing STT through LiveKit's own inference gateway means this machine only
+      // ever talks to LiveKit (proven reliable); LiveKit Cloud calls Deepgram
+      // server-side instead. Swap back to `new deepgram.STT({ model: 'nova-2',
+      // language: 'en' })` (@livekit/agents-plugin-deepgram) if/when direct
+      // connectivity to Deepgram stops being a problem.
+      stt: new inference.STT({ model: 'deepgram/nova-2', language: 'en' }),
       // TEMPORARY (smoke test): OpenAI billing is blocked, so this runs on Groq's
       // free tier via the OpenAI plugin's built-in Groq adapter (same plugin, just a
       // different backend — no separate @livekit/agents-plugin-groq needed). Reads
       // GROQ_API_KEY from env. Swap back to `new openai.LLM({ model: 'gpt-4o-mini' })`
       // per Section 2 of the spec once OpenAI billing is sorted.
-      llm: openai.LLM.withGroq({ model: 'llama-3.3-70b-versatile' }),
+      //
+      // gpt-oss-20b is a reasoning model — it spends tokens on hidden chain-of-thought
+      // before the visible reply, so give it enough headroom or short answers get cut
+      // off empty (confirmed: 10 tokens produced pure reasoning and no reply; 100 was
+      // enough). Groq's available model lineup changes often — recheck against
+      // https://api.groq.com/openai/v1/models if this 404s again later.
+      llm: openai.LLM.withGroq({ model: 'openai/gpt-oss-20b' }),
       tts: new cartesia.TTS({
         model: 'sonic-3',
         voice: process.env.CARTESIA_VOICE_ID ?? '',
