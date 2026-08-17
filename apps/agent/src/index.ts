@@ -32,6 +32,10 @@ export default defineAgent({
 
     const opening = await buildOpeningContext(learnerId); // Section 4.4
 
+    // Hoisted so the same LLM instance can also drive context compaction
+    // (Section 4.3) below, instead of spinning up a second one.
+    const llm = openai.LLM.withGroq({ model: 'openai/gpt-oss-20b' });
+
     const session = new voice.AgentSession({
       // TEMPORARY (network diagnosis): this network has flaky routing specifically to
       // Deepgram's servers (confirmed via repeated raw WebSocket tests — reliable to
@@ -53,7 +57,7 @@ export default defineAgent({
       // off empty (confirmed: 10 tokens produced pure reasoning and no reply; 100 was
       // enough). Groq's available model lineup changes often — recheck against
       // https://api.groq.com/openai/v1/models if this 404s again later.
-      llm: openai.LLM.withGroq({ model: 'openai/gpt-oss-20b' }),
+      llm,
       // TEMPORARY (cost): Cartesia's free tier (20K credits/month) was exhausted almost
       // immediately by real testing, and even the $5/mo Pro tier's 100K credits would
       // likely go the same way. Deepgram — already in use for STT — also does TTS
@@ -70,7 +74,7 @@ export default defineAgent({
     });
 
     const stateInjector = new StateInjector(session, learnerId); // Section 4.1 — shared focus
-    const compaction = new CompactionManager(session, ctx.room.name ?? 'unknown-room'); // Section 4.3
+    const compaction = new CompactionManager(session, ctx.room.name ?? 'unknown-room', llm); // Section 4.3
 
     // Section 4.2 — interruption must be a server-side event, not client-triggered, so it
     // survives mobile network jitter. AgentSession's own VAD-mode interruption (configured

@@ -41,13 +41,23 @@ export class StateInjector {
   private flush() {
     this.debounceTimer = null;
     if (this.latestState === null) return;
-    // Appended as a system message so it's present in context for the next LLM
-    // turn without triggering a reply itself (Section 4.1).
-    this.session.chatCtx.addMessage({
-      role: 'system',
-      content: `[Current Student State: ${this.latestState}]`,
-    });
+    const state = this.latestState;
     this.latestState = null;
+    void this.inject(state);
+  }
+
+  // `session.chatCtx` returns a disposable *copy* (see AgentSession.get
+  // chatCtx in @livekit/agents) — mutating it is a silent no-op that never
+  // reaches the LLM. The only path that actually feeds the next turn is
+  // `Agent.updateChatCtx()` on the currently running agent.
+  private async inject(state: string) {
+    const agent = this.session.currentAgent;
+    const ctx = agent.chatCtx.copy();
+    ctx.addMessage({
+      role: 'system',
+      content: `[Current Student State: ${state}]`,
+    });
+    await agent.updateChatCtx(ctx);
   }
 
   dispose() {
