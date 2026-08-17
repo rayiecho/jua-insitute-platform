@@ -1,26 +1,35 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { buildGradingScript, runPython } from '@/lib/sandbox';
 
 // Section 4.6 — Cost-Gated Grading. This is the margin protector: the LLM is
 // only ever called after the sandbox has already run the code, and never at
 // all if the failure is a syntax/exec-time error the sandbox already explains
-// perfectly well on its own.
+// perfectly well on its own. learnerId comes from the real session, not the
+// request body — a client-supplied id would let anyone submit and burn LLM
+// grading calls against another learner's assignment record.
 export async function POST(request: Request) {
+  const authClient = await createServerSupabaseClient();
+  const {
+    data: { user },
+  } = await authClient.auth.getUser();
+  if (!user) return NextResponse.json({ error: 'not signed in' }, { status: 401 });
+  const learnerId = user.id;
+
   const body = await request.json().catch(() => null);
-  const learnerId: string | undefined = body?.learnerId;
   const assignmentId: string | undefined = body?.assignmentId;
   const code: string | undefined = body?.code;
 
-  if (!learnerId || !assignmentId || typeof code !== 'string') {
-    return NextResponse.json({ error: 'learnerId, assignmentId, and code are required' }, { status: 400 });
+  if (!assignmentId || typeof code !== 'string') {
+    return NextResponse.json({ error: 'assignmentId and code are required' }, { status: 400 });
   }
 
   const supabase = createAdminClient();
 
   const { data: assignment, error: assignmentError } = await supabase
     .from('course_assignments')
-    .select('title, instructions_markdown, unit_test_suite_code, max_score')
+    .select('title, instructions_markdown, unit_test_suite_code, max_score, node_id')
     .eq('id', assignmentId)
     .maybeSingle();
 
@@ -67,6 +76,16 @@ export async function POST(request: Request) {
     score_achieved: review.score,
     ai_feedback_report: review.feedback,
   });
+
+  // A graded submission (any score — re-attempting for a better one is
+  // optional) is enough to unlock the next lesson. "graded" here means "got
+  // real feedback," not "passed," matching how the rest of the platform
+  // already treats this status.
+  if (assignment.node_id) {
+    await supabase
+      .from('lesson_completions')
+      .upsert({ user_id: learnerId, node_id: assignment.node_id }, { onConflict: 'user_id,node_id' });
+  }
 
   return NextResponse.json({
     gradingStatus: 'graded',

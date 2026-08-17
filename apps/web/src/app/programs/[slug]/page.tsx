@@ -1,16 +1,9 @@
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { EnrollAndStartButton } from '@/components/programs/EnrollAndStartButton';
-
-const LESSON_TYPE_LABEL: Record<string, string> = {
-  video: 'Video',
-  reading: 'Reading',
-  case_study: 'Case study',
-  quiz: 'Quiz',
-  puzzle: 'Exercise',
-};
+import { ProgramSyllabus } from '@/components/programs/ProgramSyllabus';
 
 export default async function ProgramPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -25,20 +18,32 @@ export default async function ProgramPage({ params }: { params: Promise<{ slug: 
 
   if (!course) notFound();
 
-  const { data: weeks } = await supabase
-    .from('course_weeks')
-    .select('id, week_number, title, summary, is_final_assessment')
-    .eq('course_id', course.id)
-    .order('week_number', { ascending: true });
+  const authClient = await createServerSupabaseClient();
+  const {
+    data: { user },
+  } = await authClient.auth.getUser();
 
-  const { data: nodes } = await supabase
-    .from('curriculum_nodes')
-    .select('id, title, slug, sequence_order, week_id, lesson_type')
-    .eq('course_id', course.id)
-    .order('sequence_order', { ascending: true });
+  const [{ data: weeks }, { data: nodes }, { data: completions }] = await Promise.all([
+    supabase
+      .from('course_weeks')
+      .select('id, week_number, title, summary, is_final_assessment')
+      .eq('course_id', course.id)
+      .order('week_number', { ascending: true }),
+    supabase
+      .from('curriculum_nodes')
+      .select('id, title, slug, sequence_order, week_id, lesson_type')
+      .eq('course_id', course.id)
+      .order('sequence_order', { ascending: true }),
+    user
+      ? supabase.from('lesson_completions').select('node_id').eq('user_id', user.id)
+      : Promise.resolve({ data: [] as { node_id: string }[] }),
+  ]);
 
-  const nodesByWeek = new Map<string, typeof nodes>();
-  const unweekedNodes: typeof nodes = [];
+  const completedIds = (completions ?? []).map((c) => c.node_id);
+  const completedSet = new Set(completedIds);
+
+  const nodesByWeek = new Map<string, NonNullable<typeof nodes>>();
+  const unweekedNodes: NonNullable<typeof nodes> = [];
   for (const node of nodes ?? []) {
     if (node.week_id) {
       const list = nodesByWeek.get(node.week_id) ?? [];
@@ -49,7 +54,24 @@ export default async function ProgramPage({ params }: { params: Promise<{ slug: 
     }
   }
 
+  // Flat course order (week, then sequence within week) to compute which
+  // lessons are locked — same rule as /learn/[slug]: can't skip ahead of an
+  // incomplete earlier lesson.
+  const weekOrderIndex = new Map((weeks ?? []).map((w, i) => [w.id, i]));
+  const flat = [...(nodes ?? [])].sort((a, b) => {
+    const wa = a.week_id ? (weekOrderIndex.get(a.week_id) ?? 999) : 999;
+    const wb = b.week_id ? (weekOrderIndex.get(b.week_id) ?? 999) : 999;
+    if (wa !== wb) return wa - wb;
+    return a.sequence_order - b.sequence_order;
+  });
+  const lockedIds = user
+    ? flat.filter((n, i) => flat.slice(0, i).some((earlier) => !completedSet.has(earlier.id))).map((n) => n.id)
+    : [];
+
   const firstNode = (weeks ?? []).length > 0 ? nodesByWeek.get(weeks![0].id)?.[0] : unweekedNodes[0];
+
+  const nodesByWeekObj: Record<string, NonNullable<typeof nodes>> = {};
+  for (const [weekId, list] of nodesByWeek) nodesByWeekObj[weekId] = list;
 
   return (
     <>
@@ -68,60 +90,13 @@ export default async function ProgramPage({ params }: { params: Promise<{ slug: 
           />
         )}
 
-        {weeks && weeks.length > 0 ? (
-          <div className="mt-12 space-y-8">
-            <h2 className="font-serif text-xl font-semibold text-ink">Program structure</h2>
-            {weeks.map((week) => {
-              const weekNodes = nodesByWeek.get(week.id) ?? [];
-              return (
-                <div key={week.id}>
-                  <div className="flex items-baseline gap-3">
-                    <span className="font-serif text-lg font-semibold text-tan">
-                      {week.is_final_assessment ? 'Final' : `Week ${week.week_number}`}
-                    </span>
-                    <h3 className="font-serif text-lg font-semibold text-ink">{week.title}</h3>
-                  </div>
-                  <p className="mt-1 text-sm text-ink/60">{week.summary}</p>
-
-                  {weekNodes.length > 0 ? (
-                    <ol className="mt-3 divide-y divide-border rounded-lg border border-border bg-card">
-                      {weekNodes.map((node) => (
-                        <li key={node.id}>
-                          <Link
-                            href={`/learn/${node.slug}`}
-                            className="flex items-center justify-between gap-4 px-5 py-3 hover:bg-background"
-                          >
-                            <span className="font-medium text-ink">{node.title}</span>
-                            <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-ink/40">
-                              {LESSON_TYPE_LABEL[node.lesson_type] ?? node.lesson_type}
-                            </span>
-                          </Link>
-                        </li>
-                      ))}
-                    </ol>
-                  ) : (
-                    <p className="mt-3 text-sm italic text-ink/40">Content coming soon.</p>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          unweekedNodes.length > 0 && (
-            <div className="mt-12">
-              <h2 className="font-serif text-xl font-semibold text-ink">Syllabus</h2>
-              <ol className="mt-4 divide-y divide-border rounded-lg border border-border bg-card">
-                {unweekedNodes.map((node, i) => (
-                  <li key={node.id}>
-                    <Link href={`/learn/${node.slug}`} className="flex items-center gap-4 px-5 py-4 hover:bg-background">
-                      <span className="font-serif text-lg text-tan">{String(i + 1).padStart(2, '0')}</span>
-                      <span className="font-medium text-ink">{node.title}</span>
-                    </Link>
-                  </li>
-                ))}
-              </ol>
-            </div>
-          )
+        {weeks && weeks.length > 0 && (
+          <ProgramSyllabus
+            weeks={weeks}
+            nodesByWeek={nodesByWeekObj}
+            completedIds={completedIds}
+            lockedIds={lockedIds}
+          />
         )}
       </main>
     </>

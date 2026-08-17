@@ -2,11 +2,13 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { AssignmentPanel } from '@/components/tutor/AssignmentPanel';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { YouTubeEmbed } from '@/components/programs/YouTubeEmbed';
 import { LessonViewTracker } from '@/components/programs/LessonViewTracker';
 import { QuizLesson } from '@/components/programs/QuizLesson';
+import { MarkCompleteButton } from '@/components/programs/MarkCompleteButton';
 
 const LESSON_TYPE_LABEL: Record<string, string> = {
   video: 'Video',
@@ -35,7 +37,12 @@ export default async function LessonPage({ params }: { params: Promise<{ slug: s
 
   if (!node) notFound();
 
-  const [{ data: course }, { data: weeks }, { data: allNodes }] = await Promise.all([
+  const authClient = await createServerSupabaseClient();
+  const {
+    data: { user },
+  } = await authClient.auth.getUser();
+
+  const [{ data: course }, { data: weeks }, { data: allNodes }, { data: completions }] = await Promise.all([
     supabase.from('courses').select('slug, title').eq('id', node.course_id).maybeSingle(),
     supabase
       .from('course_weeks')
@@ -46,10 +53,15 @@ export default async function LessonPage({ params }: { params: Promise<{ slug: s
       .from('curriculum_nodes')
       .select('id, title, slug, sequence_order, week_id, lesson_type')
       .eq('course_id', node.course_id),
+    user
+      ? supabase.from('lesson_completions').select('node_id').eq('user_id', user.id)
+      : Promise.resolve({ data: [] as { node_id: string }[] }),
   ]);
 
+  const completedIds = new Set((completions ?? []).map((c) => c.node_id));
+
   // Flatten into course order (week_number, then sequence_order within the
-  // week) so Previous/Next can cross week boundaries seamlessly.
+  // week) so Previous/Next and unlocking both work across week boundaries.
   const weekOrder = new Map((weeks ?? []).map((w, i) => [w.id, i]));
   const flat = [...(allNodes ?? [])].sort((a, b) => {
     const wa = a.week_id ? (weekOrder.get(a.week_id) ?? 999) : 999;
@@ -60,6 +72,12 @@ export default async function LessonPage({ params }: { params: Promise<{ slug: s
   const currentIndex = flat.findIndex((n) => n.id === node.id);
   const prevNode = currentIndex > 0 ? flat[currentIndex - 1] : null;
   const nextNode = currentIndex >= 0 && currentIndex < flat.length - 1 ? flat[currentIndex + 1] : null;
+
+  // Locked if any earlier lesson in the course isn't complete yet — can't
+  // skip ahead, matching the Canvas-style sequential structure. Signed-out
+  // visitors just see content unlocked (nothing to gate against yet).
+  const isLocked = user ? flat.slice(0, currentIndex).some((n) => !completedIds.has(n.id)) : false;
+  const isComplete = completedIds.has(node.id);
 
   const currentWeek = (weeks ?? []).find((w) => w.id === node.week_id) ?? null;
   const weekNodes = currentWeek ? flat.filter((n) => n.week_id === currentWeek.id) : [];
@@ -80,14 +98,19 @@ export default async function LessonPage({ params }: { params: Promise<{ slug: s
           <nav className="mt-4 flex flex-col gap-1">
             {weekNodes.map((n) => {
               const isCurrent = n.id === node.id;
+              const nIndex = flat.findIndex((f) => f.id === n.id);
+              const nLocked = user ? flat.slice(0, nIndex).some((f) => !completedIds.has(f.id)) : false;
+              const nDone = completedIds.has(n.id);
               return (
                 <Link
                   key={n.id}
-                  href={`/learn/${n.slug}`}
-                  className={`rounded px-3 py-2 text-sm ${
-                    isCurrent ? 'bg-gold/10 font-medium text-ink' : 'text-ink/60 hover:bg-card'
+                  href={nLocked ? '#' : `/learn/${n.slug}`}
+                  aria-disabled={nLocked}
+                  className={`flex items-center gap-2 rounded px-3 py-2 text-sm ${
+                    isCurrent ? 'bg-gold/10 font-medium text-ink' : nLocked ? 'text-ink/30' : 'text-ink/60 hover:bg-card'
                   }`}
                 >
+                  <span className="w-4 shrink-0 text-center">{nDone ? '✓' : nLocked ? '🔒' : ''}</span>
                   {n.title}
                 </Link>
               );
@@ -107,18 +130,40 @@ export default async function LessonPage({ params }: { params: Promise<{ slug: s
       ) : (
         <span />
       )}
-      {nextNode ? (
-        <Link
-          href={`/learn/${nextNode.slug}`}
-          className="rounded bg-gold px-5 py-2.5 text-sm font-semibold text-ink"
-        >
-          Next: {nextNode.title} →
-        </Link>
-      ) : (
-        <span />
-      )}
+      {nextNode &&
+        (isComplete ? (
+          <Link
+            href={`/learn/${nextNode.slug}`}
+            className="rounded bg-gold px-5 py-2.5 text-sm font-semibold text-ink"
+          >
+            Next: {nextNode.title} →
+          </Link>
+        ) : (
+          <span className="text-sm text-ink/40" title="Complete this lesson to unlock the next one">
+            Next: {nextNode.title} 🔒
+          </span>
+        ))}
     </div>
   );
+
+  if (isLocked) {
+    return (
+      <>
+        <SiteHeader />
+        <main className="mx-auto flex w-full max-w-6xl gap-10 px-6 py-10">
+          {sidebar}
+          <div className="min-w-0 flex-1">
+            <div className="rounded-2xl border border-border bg-card px-8 py-14 text-center">
+              <p className="font-serif text-xl font-semibold text-ink">🔒 Locked</p>
+              <p className="mt-2 text-sm text-ink/60">
+                Complete the earlier lessons in this program first — pick up where you left off from the sidebar.
+              </p>
+            </div>
+          </div>
+        </main>
+      </>
+    );
+  }
 
   if (node.lesson_type === 'quiz') {
     const { data: questions } = await supabase
@@ -134,7 +179,7 @@ export default async function LessonPage({ params }: { params: Promise<{ slug: s
         <main className="mx-auto flex w-full max-w-6xl gap-10 px-6 py-10">
           {sidebar}
           <div className="min-w-0 flex-1">
-            <QuizLesson title={node.title} questions={questions ?? []} />
+            <QuizLesson title={node.title} questions={questions ?? []} nodeId={node.id} alreadyDone={isComplete} />
             {lessonNav}
           </div>
         </main>
@@ -167,6 +212,9 @@ export default async function LessonPage({ params }: { params: Promise<{ slug: s
           <ReactMarkdown>{assignment.instructions_markdown}</ReactMarkdown>
         </>
       )}
+      {/* Assignment-backed lessons complete via grading (see /api/grade), not
+          this button — the assignment panel already provides that signal. */}
+      {!assignment && <MarkCompleteButton nodeId={node.id} alreadyDone={isComplete} />}
     </article>
   );
 

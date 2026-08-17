@@ -31,7 +31,7 @@ export function MonacoAssignment({ learnerId, assignmentId, starterCode }: Monac
   // Load any code the learner already had in progress for this assignment.
   useEffect(() => {
     let cancelled = false;
-    fetch(`/api/progress?learnerId=${encodeURIComponent(learnerId)}&assignmentId=${encodeURIComponent(assignmentId)}`)
+    fetch(`/api/progress?assignmentId=${encodeURIComponent(assignmentId)}`)
       .then((res) => res.json())
       .then((data) => {
         if (cancelled) return;
@@ -59,7 +59,7 @@ export function MonacoAssignment({ learnerId, assignmentId, starterCode }: Monac
         const res = await fetch('/api/progress', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ learnerId, assignmentId, code: next }),
+          body: JSON.stringify({ assignmentId, code: next }),
         });
         setStatus(res.ok ? 'saved' : 'error');
       } catch {
@@ -75,7 +75,7 @@ export function MonacoAssignment({ learnerId, assignmentId, starterCode }: Monac
       const res = await fetch('/api/grade', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ learnerId, assignmentId, code }),
+        body: JSON.stringify({ assignmentId, code }),
       });
       const data = await res.json();
       if (res.ok) setGrade(data);

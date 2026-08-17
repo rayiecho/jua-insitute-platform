@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 interface QuizQuestion {
   id: string;
@@ -10,13 +10,35 @@ interface QuizQuestion {
   explanation: string | null;
 }
 
-export function QuizLesson({ title, questions }: { title: string; questions: QuizQuestion[] }) {
+export function QuizLesson({
+  title,
+  questions,
+  nodeId,
+  alreadyDone,
+}: {
+  title: string;
+  questions: QuizQuestion[];
+  nodeId: string;
+  alreadyDone: boolean;
+}) {
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [revealed, setRevealed] = useState<Record<string, boolean>>({});
 
   const answeredCount = Object.keys(revealed).length;
   const correctCount = questions.filter((q) => revealed[q.id] && answers[q.id] === q.correct_index).length;
-  const done = answeredCount === questions.length;
+  const done = alreadyDone || (questions.length > 0 && answeredCount === questions.length);
+
+  // Finishing all questions IS completion for a quiz — no separate "mark
+  // done" click needed, unlike reading/video/case_study/puzzle lessons.
+  useEffect(() => {
+    if (alreadyDone || questions.length === 0 || answeredCount !== questions.length) return;
+    fetch('/api/lesson-complete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nodeId }),
+    }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [answeredCount, questions.length, alreadyDone, nodeId]);
 
   function choose(questionId: string, optionIndex: number) {
     if (revealed[questionId]) return; // already answered — don't let them change it after seeing feedback

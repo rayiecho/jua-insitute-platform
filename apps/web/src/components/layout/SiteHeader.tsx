@@ -13,6 +13,9 @@ export function SiteHeader() {
           <Link href="/programs" className="text-ink/70 hover:text-ink">
             Programs
           </Link>
+          <Link href="/dashboard" className="text-ink/70 hover:text-ink">
+            Dashboard
+          </Link>
           <TalkToTutorButton className="rounded bg-gold px-4 py-2 font-semibold text-ink" />
         </nav>
       </div>
