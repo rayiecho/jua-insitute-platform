@@ -3,16 +3,24 @@
 import { useState } from 'react';
 import { createBrowserSupabaseClient } from '@/lib/supabase/client';
 
+const NEXT_COOKIE = 'auth_next';
+
 // Real email verification via Supabase Auth — magic links (no new vendor
-// needed, Supabase/AWS SES sends the email) or Google Sign-In, both go
-// through the same /auth/callback and both count as "verified" the same
-// way. Verification happens once, at first sign-in — after that, the
-// session cookie persists (see middleware.ts), so returning learners just
-// land on whatever page they visit already signed in, no repeat
-// verification. 'enroll' mode collects a name (first-time registration,
-// e.g. from EnrollAndStartButton) for the email path — Google supplies a
-// name automatically. 'signin' mode is email-only for returning learners
-// joining a live class, matching "they just type their email address."
+// needed, Supabase/AWS SES sends the email) or Google Sign-In, both count
+// as "verified" the same way and both get handled by middleware.ts on the
+// way back. Verification happens once, at first sign-in — after that, the
+// session cookie persists, so returning learners just land on whatever
+// page they visit already signed in, no repeat verification. 'enroll' mode
+// collects a name (first-time registration, e.g. from EnrollAndStartButton)
+// for the email path — Google supplies a name automatically. 'signin' mode
+// is email-only for returning learners joining a live class, matching
+// "they just type their email address."
+//
+// `next` is stashed in a cookie rather than passed through the redirect
+// URL — confirmed live (2026-08-18) that Supabase truncates whatever
+// path/query we request down to the bare origin regardless of Redirect URL
+// config, so a query param would just get silently dropped. The cookie
+// survives the round-trip regardless of what Supabase does to the URL.
 export function EmailAuthForm({
   mode,
   next,
@@ -30,14 +38,21 @@ export function EmailAuthForm({
   const [googleSubmitting, setGoogleSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  function stashNext() {
+    // Path cookie, 10 minutes — long enough to check email and click, short
+    // enough not to linger if abandoned.
+    document.cookie = `${NEXT_COOKIE}=${encodeURIComponent(next)}; path=/; max-age=600; SameSite=Lax`;
+  }
+
   async function handleGoogle() {
     setGoogleSubmitting(true);
     setError(null);
     try {
+      stashNext();
       const supabase = createBrowserSupabaseClient();
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: { redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}` },
+        options: { redirectTo: window.location.origin },
       });
       if (oauthError) throw oauthError;
       // On success the SDK redirects the browser itself — nothing else to do here.
@@ -52,11 +67,12 @@ export function EmailAuthForm({
     setSubmitting(true);
     setError(null);
     try {
+      stashNext();
       const supabase = createBrowserSupabaseClient();
       const { error: sendError } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
+          emailRedirectTo: window.location.origin,
           data: mode === 'enroll' ? { first_name: firstName, last_name: lastName } : undefined,
         },
       });
