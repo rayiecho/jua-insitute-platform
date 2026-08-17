@@ -1,9 +1,9 @@
 import { supabase } from './supabase.js';
-import { embedText } from './embeddings.js';
 
 export interface OpeningContext {
   systemPrompt: string;
   openingLine: string;
+  preparedVideo: { title: string; url: string } | null;
 }
 
 // Section 4.4 — "Pick up where we left off". Runs once at session start, before
@@ -47,6 +47,11 @@ export async function buildOpeningContext(learnerId: string): Promise<OpeningCon
   if (curriculumContext?.nodeTitle || curriculumContext?.assignmentTitle) {
     parts.push('Stay with this lesson unless the learner explicitly asks to move on.');
   }
+  if (curriculumContext?.videoUrl) {
+    parts.push(
+      `A short video for this lesson is prepared and will be shared in the room automatically. Mention early in the session that you've prepared a video on this topic and that they can watch it in the session guide panel.`,
+    );
+  }
   if (progress) {
     parts.push(
       `Current assignment in progress: "${progress.title}" (status: ${progress.grading_status}).`,
@@ -66,6 +71,10 @@ export async function buildOpeningContext(learnerId: string): Promise<OpeningCon
       : curriculumContext?.nodeTitle
         ? `Welcome the learner and confirm you're picking up with "${curriculumContext.nodeTitle}".`
         : 'Welcome the learner and ask what they would like to focus on first.',
+    preparedVideo:
+      curriculumContext?.videoUrl && curriculumContext.nodeTitle
+        ? { title: curriculumContext.nodeTitle, url: curriculumContext.videoUrl }
+        : null,
   };
 }
 
@@ -89,6 +98,7 @@ interface CurrentCurriculumContext {
   courseTitle: string | null;
   nodeTitle: string | null;
   nodeContent: string | null;
+  videoUrl: string | null;
   assignmentTitle: string | null;
   assignmentInstructions: string | null;
 }
@@ -97,7 +107,7 @@ async function fetchCurrentCurriculumContext(learnerId: string): Promise<Current
   const { data } = await supabase
     .from('session_curriculum_context')
     .select(
-      'session_summary, node:curriculum_nodes!active_node_id(title, markdown_content, course:courses(title)), assignment:course_assignments!active_assignment_id(title, instructions_markdown)',
+      'session_summary, node:curriculum_nodes!active_node_id(title, markdown_content, video_url, course:courses(title)), assignment:course_assignments!active_assignment_id(title, instructions_markdown)',
     )
     .eq('user_id', learnerId)
     .order('created_at', { ascending: false })
@@ -113,42 +123,28 @@ async function fetchCurrentCurriculumContext(learnerId: string): Promise<Current
     courseTitle: course?.title ?? null,
     nodeTitle: node?.title ?? null,
     nodeContent: node?.markdown_content ?? null,
+    videoUrl: node?.video_url ?? null,
     assignmentTitle: assignment?.title ?? null,
     assignmentInstructions: assignment?.instructions_markdown ?? null,
   };
 }
 
-async function fetchRelevantMemories(learnerId: string, queryText: string | null): Promise<string[]> {
-  // No curriculum context yet (learner hasn't enrolled/opened a lesson) —
-  // nothing sensible to search against, so just surface the most recent.
-  if (!queryText) {
-    const { data } = await supabase
-      .from('lesson_memory_vectors')
-      .select('summary_text')
-      .eq('user_id', learnerId)
-      .order('created_at', { ascending: false })
-      .limit(5);
-    return (data ?? []).map((row) => row.summary_text);
-  }
-
-  try {
-    const queryEmbedding = await embedText(queryText);
-    const { data, error } = await supabase.rpc('match_lesson_memories', {
-      query_embedding: queryEmbedding,
-      match_user_id: learnerId,
-      match_count: 5,
-    });
-    if (error) throw error;
-    return (data ?? []).map((row: { summary_text: string }) => row.summary_text);
-  } catch {
-    // Embedding model not ready yet / RPC unavailable — fall back rather than
-    // open with no memory at all.
-    const { data } = await supabase
-      .from('lesson_memory_vectors')
-      .select('summary_text')
-      .eq('user_id', learnerId)
-      .order('created_at', { ascending: false })
-      .limit(5);
-    return (data ?? []).map((row) => row.summary_text);
-  }
+async function fetchRelevantMemories(learnerId: string, _queryText: string | null): Promise<string[]> {
+  // TEMPORARILY DISABLED (2026-08-17): embedText() (apps/agent/src/embeddings.ts)
+  // hung tutor sessions on session start TWICE in production, including after
+  // adding a 4s Promise.race timeout around it — meaning the hang is very
+  // likely a *synchronous* blocking call inside onnxruntime-node's native
+  // model-init addon, which can starve the event loop badly enough that even
+  // an independent setTimeout callback never gets a turn to fire. A JS-level
+  // timeout can't protect against that; only real thread/process isolation
+  // (e.g. running the model in a worker_thread) can. Reverted to the
+  // recency-based fallback unconditionally until that's built and verified —
+  // reliable live tutoring matters far more than semantic memory ranking.
+  const { data } = await supabase
+    .from('lesson_memory_vectors')
+    .select('summary_text')
+    .eq('user_id', learnerId)
+    .order('created_at', { ascending: false })
+    .limit(5);
+  return (data ?? []).map((row) => row.summary_text);
 }

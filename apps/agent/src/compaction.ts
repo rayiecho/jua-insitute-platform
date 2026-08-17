@@ -1,6 +1,5 @@
 import { AgentSessionEventTypes, ChatContext, type ConversationItemAddedEvent, type LLM, type voice } from '@livekit/agents';
 import { supabase } from './supabase.js';
-import { embedText } from './embeddings.js';
 
 const TOKEN_THRESHOLD = 3000; // Section 7 — start at ~3,000 tokens, tune from real usage
 const CHARS_PER_TOKEN_ESTIMATE = 4; // rough heuristic until a real tokenizer is wired in
@@ -20,7 +19,6 @@ export class CompactionManager {
     private readonly session: voice.AgentSession,
     private readonly sessionRoomName: string,
     private readonly llm: LLM,
-    private readonly learnerId: string,
   ) {
     this.session.on(AgentSessionEventTypes.ConversationItemAdded, (ev) => this.onItem(ev));
   }
@@ -115,21 +113,12 @@ export class CompactionManager {
         turn_range_end: turnRangeEnd,
       });
 
-      // Section 4.4 — this is the write side of long-term memory: each
-      // compacted summary becomes a searchable memory for future sessions.
-      // Best-effort — a missed embedding just means slightly thinner
-      // continuity next session, not a broken one.
-      try {
-        const embedding = await embedText(summaryText);
-        await supabase.from('lesson_memory_vectors').insert({
-          user_id: this.learnerId,
-          session_id: sessionRow.id,
-          summary_text: summaryText,
-          embedding,
-        });
-      } catch {
-        // model not ready yet / transient failure — skip, don't block compaction
-      }
+      // TEMPORARILY DISABLED (2026-08-17): see the matching note in
+      // continuity.ts — embedText() can block the event loop synchronously
+      // via onnxruntime-node's native addon, which is worse here than on
+      // session start: it would hang an *already live* call mid-conversation
+      // when compaction fires. Skipping the write side until embedding
+      // generation is properly isolated in a worker thread.
     } finally {
       this.compacting = false;
     }

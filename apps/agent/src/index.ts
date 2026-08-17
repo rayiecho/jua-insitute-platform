@@ -18,6 +18,7 @@ import { StateInjector } from './state-injection.js';
 import { CompactionManager } from './compaction.js';
 import { logConnectionEvent } from './supabase.js';
 import { logSessionUsage } from './cost-tracking.js';
+import { HandRaiseListener, publishPreparedVideo } from './room-interactions.js';
 
 // Section 4.1 / 4.2 / 4.3 of platform-technical-specification-mvp.md drive the
 // shape of this worker. Each numbered section below maps to one behavior
@@ -75,7 +76,8 @@ export default defineAgent({
     });
 
     const stateInjector = new StateInjector(session, learnerId); // Section 4.1 — shared focus
-    const compaction = new CompactionManager(session, ctx.room.name ?? 'unknown-room', llm, learnerId); // Section 4.3
+    const compaction = new CompactionManager(session, ctx.room.name ?? 'unknown-room', llm); // Section 4.3
+    const handRaise = new HandRaiseListener(ctx.room, session); // live-class raise-hand
     const sessionStartedAt = Date.now(); // Section 5/6 — cost monitoring
 
     // Section 4.2 — interruption must be a server-side event, not client-triggered, so it
@@ -89,6 +91,7 @@ export default defineAgent({
     session.on(AgentSessionEventTypes.Close, () => {
       stateInjector.dispose();
       compaction.dispose();
+      handRaise.dispose();
       void logSessionUsage(session, ctx.room.name ?? 'unknown-room', sessionStartedAt);
     });
 
@@ -99,6 +102,8 @@ export default defineAgent({
 
     await ctx.connect();
     await logConnectionEvent(ctx.room.name ?? 'unknown-room', 'connected'); // Section 4.5
+
+    if (opening.preparedVideo) publishPreparedVideo(ctx.room, opening.preparedVideo);
 
     await session.generateReply({ instructions: opening.openingLine });
   },

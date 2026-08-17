@@ -1,13 +1,20 @@
 'use client';
 
+import { useState } from 'react';
+import { Track } from 'livekit-client';
 import {
   BarVisualizer,
   DisconnectButton,
   StartAudio,
-  useVoiceAssistant,
+  VideoTrack,
+  useDataChannel,
   useLocalParticipant,
+  useTracks,
+  useVoiceAssistant,
 } from '@livekit/components-react';
 import { LogoMark } from '@/components/brand/Logo';
+import { ClassroomShell } from './ClassroomShell';
+import { SessionGuidePanel } from './SessionGuidePanel';
 import type { Learner } from '@/lib/learner';
 
 const AGENT_STATE_LABEL: Record<string, string> = {
@@ -19,65 +26,175 @@ const AGENT_STATE_LABEL: Record<string, string> = {
   speaking: 'Speaking',
 };
 
+const REACTIONS = ['👍', '🎉', '❓', '👏'];
+
 // The live classroom (Section 1: "The Live Class Layer"). Laid out like a
-// real meeting room — a tutor "stage" tile and a learner tile — so the room
-// this photorealistic-avatar-and-vision work eventually slots into already
-// exists and looks intentional today, not like a placeholder waiting for a
-// feature. Presence is voice + waveform for now (Phase 1 scope); the Camera
-// control is visibly reserved, not hidden, so its arrival later isn't a
-// layout change.
+// real meeting room — a tutor "stage" tile and a learner tile — with the
+// interaction layer a real class needs: raise hand (reaches the tutor's
+// actual live context, not just a UI toggle — see
+// apps/agent/src/room-interactions.ts), reactions, screen share, and a
+// session guide panel standing in for "prepared slides", built from the
+// same lesson content the tutor already teaches from rather than a new
+// slide-authoring system. Camera is visibly reserved (present, disabled)
+// for the eventual avatar rather than hidden.
 export function TutorSessionUI({ learner }: { learner: Learner }) {
   const { state, audioTrack } = useVoiceAssistant();
-  const { isMicrophoneEnabled, localParticipant } = useLocalParticipant();
+  const { isMicrophoneEnabled, isScreenShareEnabled, localParticipant } = useLocalParticipant();
+  const [guideOpen, setGuideOpen] = useState(false);
+  const [handRaised, setHandRaised] = useState(false);
+  const [reactions, setReactions] = useState<{ id: number; emoji: string }[]>([]);
+  const screenShareTracks = useTracks([Track.Source.ScreenShare]);
+  const screenShareTrack = screenShareTracks[0];
+
+  const { send: sendHandRaise } = useDataChannel('hand-raise');
+  const { send: sendReaction } = useDataChannel('reaction', (msg) => {
+    try {
+      const { emoji } = JSON.parse(new TextDecoder().decode(msg.payload)) as { emoji: string };
+      addReaction(emoji);
+    } catch {
+      // ignore malformed payload
+    }
+  });
 
   const stateLabel = AGENT_STATE_LABEL[state] ?? state;
   const isLive = state === 'listening' || state === 'thinking' || state === 'speaking';
 
+  function addReaction(emoji: string) {
+    const id = Date.now() + Math.random();
+    setReactions((prev) => [...prev, { id, emoji }]);
+    setTimeout(() => setReactions((prev) => prev.filter((r) => r.id !== id)), 2000);
+  }
+
+  function toggleHandRaise() {
+    const next = !handRaised;
+    setHandRaised(next);
+    void sendHandRaise(new TextEncoder().encode(JSON.stringify({ raised: next, name: learner.firstName })), {
+      reliable: true,
+    });
+    if (next) addReaction('✋');
+  }
+
+  function sendEmoji(emoji: string) {
+    addReaction(emoji);
+    void sendReaction(new TextEncoder().encode(JSON.stringify({ emoji })), { reliable: false });
+  }
+
   return (
-    <main className="flex min-h-screen flex-col bg-background">
-      <div className="flex items-center justify-between border-b border-border px-6 py-4">
-        <div className="flex items-center gap-2 text-sm text-ink/60">
-          <LogoMark className="h-5 w-5" />
-          <span>Live class</span>
+    <ClassroomShell>
+      <main className="flex min-h-screen flex-col">
+        <div className="flex items-center justify-between border-b border-border px-6 py-4">
+          <div className="flex items-center gap-2 text-sm text-ink/60">
+            <LogoMark className="h-5 w-5" />
+            <span>Live class</span>
+          </div>
+          <span className="flex items-center gap-1.5 text-xs font-medium text-ink/60">
+            <span className={`h-2 w-2 rounded-full ${isLive ? 'bg-gold' : 'bg-border'}`} />
+            {stateLabel}
+          </span>
         </div>
-        <span className="flex items-center gap-1.5 text-xs font-medium text-ink/60">
-          <span className={`h-2 w-2 rounded-full ${isLive ? 'bg-gold' : 'bg-border'}`} />
-          {stateLabel}
-        </span>
-      </div>
 
-      <div className="relative flex flex-1 items-center justify-center p-6">
-        <TutorTile state={state} audioTrack={audioTrack} label={stateLabel} />
-        <LearnerTile learner={learner} micOn={isMicrophoneEnabled} />
-      </div>
+        <div className="relative flex flex-1 items-center justify-center overflow-hidden p-6">
+          {screenShareTrack ? (
+            <div className="aspect-video w-full max-w-4xl overflow-hidden rounded-2xl border border-border bg-ink shadow-sm">
+              <VideoTrack trackRef={screenShareTrack} className="h-full w-full" />
+            </div>
+          ) : (
+            <TutorTile state={state} audioTrack={audioTrack} label={stateLabel} />
+          )}
 
-      <div className="flex items-center justify-center gap-3 border-t border-border px-6 py-5">
-        <StartAudio
-          label="Click to enable audio"
-          className="rounded bg-gold px-4 py-2 text-sm font-semibold text-ink"
-        />
-        <button
-          type="button"
-          onClick={() => localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled)}
-          className={`rounded-full border px-5 py-2.5 text-sm font-medium transition-colors ${
-            isMicrophoneEnabled ? 'border-border text-ink hover:bg-card' : 'border-red-300 bg-red-50 text-red-600'
-          }`}
-        >
-          {isMicrophoneEnabled ? 'Mute' : 'Unmute'}
-        </button>
-        <button
-          type="button"
-          disabled
-          title="Video is coming soon"
-          className="cursor-not-allowed rounded-full border border-border px-5 py-2.5 text-sm font-medium text-ink/30"
-        >
-          Camera
-        </button>
-        <DisconnectButton className="rounded-full bg-red-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-red-700">
-          Leave
-        </DisconnectButton>
-      </div>
-    </main>
+          <LearnerTile learner={learner} micOn={isMicrophoneEnabled} handRaised={handRaised} />
+
+          {/* Floating reactions rise from the center of the stage. */}
+          <div className="pointer-events-none absolute inset-x-0 bottom-1/3 flex justify-center">
+            {reactions.map((r) => (
+              <span
+                key={r.id}
+                className="absolute text-4xl"
+                style={{ animation: 'float-up 2s ease-out forwards' }}
+              >
+                {r.emoji}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-center gap-2 border-t border-border px-6 py-5">
+          <StartAudio
+            label="Click to enable audio"
+            className="rounded bg-gold px-4 py-2 text-sm font-semibold text-ink"
+          />
+
+          <button
+            type="button"
+            onClick={() => localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled)}
+            className={`rounded-full border px-4 py-2.5 text-sm font-medium transition-colors ${
+              isMicrophoneEnabled ? 'border-border text-ink hover:bg-card' : 'border-red-300 bg-red-50 text-red-600'
+            }`}
+          >
+            {isMicrophoneEnabled ? 'Mute' : 'Unmute'}
+          </button>
+
+          <button
+            type="button"
+            onClick={toggleHandRaise}
+            className={`rounded-full border px-4 py-2.5 text-sm font-medium transition-colors ${
+              handRaised ? 'border-gold bg-gold/10 text-gold-dark' : 'border-border text-ink hover:bg-card'
+            }`}
+          >
+            ✋ {handRaised ? 'Lower hand' : 'Raise hand'}
+          </button>
+
+          <div className="flex items-center gap-1 rounded-full border border-border px-2 py-1.5">
+            {REACTIONS.map((emoji) => (
+              <button
+                key={emoji}
+                type="button"
+                onClick={() => sendEmoji(emoji)}
+                className="rounded-full px-1.5 py-1 text-lg hover:bg-card"
+                title="Send a reaction"
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => localParticipant.setScreenShareEnabled(!isScreenShareEnabled)}
+            className={`rounded-full border px-4 py-2.5 text-sm font-medium transition-colors ${
+              isScreenShareEnabled ? 'border-gold bg-gold/10 text-gold-dark' : 'border-border text-ink hover:bg-card'
+            }`}
+          >
+            {isScreenShareEnabled ? 'Stop sharing' : 'Share screen'}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setGuideOpen((v) => !v)}
+            className={`rounded-full border px-4 py-2.5 text-sm font-medium transition-colors ${
+              guideOpen ? 'border-gold bg-gold/10 text-gold-dark' : 'border-border text-ink hover:bg-card'
+            }`}
+          >
+            Guide
+          </button>
+
+          <button
+            type="button"
+            disabled
+            title="Video is coming soon"
+            className="cursor-not-allowed rounded-full border border-border px-4 py-2.5 text-sm font-medium text-ink/30"
+          >
+            Camera
+          </button>
+
+          <DisconnectButton className="rounded-full bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700">
+            Leave
+          </DisconnectButton>
+        </div>
+      </main>
+
+      <SessionGuidePanel learnerId={learner.id} open={guideOpen} onClose={() => setGuideOpen(false)} />
+    </ClassroomShell>
   );
 }
 
@@ -114,10 +231,19 @@ function TutorTile({
   );
 }
 
-function LearnerTile({ learner, micOn }: { learner: Learner; micOn: boolean }) {
+function LearnerTile({
+  learner,
+  micOn,
+  handRaised,
+}: {
+  learner: Learner;
+  micOn: boolean;
+  handRaised: boolean;
+}) {
   const initial = learner.firstName.charAt(0).toUpperCase();
   return (
     <div className="absolute bottom-8 right-8 flex items-center gap-2.5 rounded-xl border border-border bg-card px-4 py-2.5 shadow-sm">
+      {handRaised && <span title="Hand raised">✋</span>}
       <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gold text-xs font-semibold text-ink">
         {initial}
       </span>
