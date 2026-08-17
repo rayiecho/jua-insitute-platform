@@ -71,7 +71,7 @@ function Connector({ room, learner }: { room: string; learner: Learner }) {
       onError={(err) => setError(err.message)}
       className="min-h-screen"
     >
-      <TutorSessionUI />
+      <TutorSessionUI learner={learner} />
       <RoomAudioRenderer />
     </LiveKitRoom>
   );
