@@ -35,26 +35,26 @@ export function LearnerGate({ children }: { children: (learner: Learner) => Reac
   if (!learner) {
     return (
       <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-4 px-6">
-        <h1 className="text-xl font-semibold">Who&apos;s learning?</h1>
-        <p className="text-sm text-gray-500">
-          No accounts yet in this MVP — just tells the tutor who you are so it can remember you.
+        <h1 className="font-serif text-2xl font-semibold text-ink">Who&apos;s learning?</h1>
+        <p className="text-sm text-ink/60">
+          Tell us who you are so your tutor remembers you between sessions.
         </p>
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           <input
-            className="rounded border border-gray-300 px-3 py-2"
+            className="rounded border border-border bg-card px-3 py-2 text-ink"
             placeholder="First name"
             value={firstName}
             onChange={(e) => setFirstName(e.target.value)}
             autoFocus
           />
           <input
-            className="rounded border border-gray-300 px-3 py-2"
+            className="rounded border border-border bg-card px-3 py-2 text-ink"
             placeholder="Last name"
             value={lastName}
             onChange={(e) => setLastName(e.target.value)}
           />
           <input
-            className="rounded border border-gray-300 px-3 py-2"
+            className="rounded border border-border bg-card px-3 py-2 text-ink"
             placeholder="Email"
             type="email"
             value={email}
@@ -63,7 +63,7 @@ export function LearnerGate({ children }: { children: (learner: Learner) => Reac
           <button
             type="submit"
             disabled={submitting || !firstName.trim() || !lastName.trim() || !email.trim()}
-            className="rounded bg-black px-3 py-2 text-white disabled:opacity-50"
+            className="rounded bg-gold px-3 py-2 font-semibold text-ink disabled:opacity-50"
           >
             {submitting ? 'Continuing…' : 'Continue'}
           </button>

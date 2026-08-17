@@ -30,7 +30,7 @@ export function LoginScreen({ onLoggedIn }: { onLoggedIn: (learner: Learner) => 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Who&apos;s learning?</Text>
-      <Text style={styles.subtitle}>No accounts yet in this MVP — just tells the tutor who you are.</Text>
+      <Text style={styles.subtitle}>Tell us who you are so your tutor remembers you between sessions.</Text>
       <TextInput style={styles.input} placeholder="First name" value={firstName} onChangeText={setFirstName} />
       <TextInput style={styles.input} placeholder="Last name" value={lastName} onChangeText={setLastName} />
       <TextInput
@@ -54,12 +54,12 @@ export function LoginScreen({ onLoggedIn }: { onLoggedIn: (learner: Learner) => 
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', padding: 24, gap: 12 },
-  title: { fontSize: 22, fontWeight: '600' },
-  subtitle: { fontSize: 13, color: '#666', marginBottom: 8 },
-  input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 6, padding: 10 },
-  button: { backgroundColor: '#000', borderRadius: 6, padding: 12, alignItems: 'center', marginTop: 8 },
+  container: { flex: 1, justifyContent: 'center', padding: 24, gap: 12, backgroundColor: '#FBF7F0' },
+  title: { fontSize: 22, fontWeight: '600', color: '#1C1810' },
+  subtitle: { fontSize: 13, color: '#8B6F47', marginBottom: 8 },
+  input: { borderWidth: 1, borderColor: '#E8DDC9', borderRadius: 6, padding: 10, backgroundColor: '#fff', color: '#1C1810' },
+  button: { backgroundColor: '#C8862B', borderRadius: 6, padding: 12, alignItems: 'center', marginTop: 8 },
   buttonDisabled: { opacity: 0.5 },
-  buttonText: { color: '#fff', fontWeight: '600' },
+  buttonText: { color: '#1C1810', fontWeight: '600' },
   error: { color: '#c00', fontSize: 13 },
 });
