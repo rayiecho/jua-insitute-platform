@@ -1,6 +1,7 @@
 'use client';
 
-const STORAGE_KEY = 'ai-tutor:learner';
+import { useEffect, useState } from 'react';
+import { createBrowserSupabaseClient } from './supabase/client';
 
 export interface Learner {
   id: string;
@@ -9,59 +10,45 @@ export interface Learner {
   email: string;
 }
 
-// Cache keyed by the raw string so getSnapshot returns a stable reference
-// across calls when localStorage hasn't actually changed — required for
-// useSyncExternalStore, which otherwise treats every new object as a change
-// and re-renders forever.
-let cachedRaw: string | null = null;
-let cachedLearner: Learner | null = null;
+// Real auth session, not localStorage — replaces the old name/email stand-in.
+// `loading` stays true until the initial session check resolves, so callers
+// can distinguish "not signed in" from "haven't checked yet."
+export function useLearnerSession(): { learner: Learner | null; loading: boolean; signOut: () => Promise<void> } {
+  const [learner, setLearner] = useState<Learner | null>(null);
+  const [loading, setLoading] = useState(true);
 
-function readSnapshot(): Learner | null {
-  const raw = window.localStorage.getItem(STORAGE_KEY);
-  if (raw === cachedRaw) return cachedLearner;
-  cachedRaw = raw;
-  try {
-    cachedLearner = raw ? (JSON.parse(raw) as Learner) : null;
-  } catch {
-    cachedLearner = null;
+  useEffect(() => {
+    let cancelled = false;
+    const supabase = createBrowserSupabaseClient();
+
+    async function loadLearner() {
+      const res = await fetch('/api/me');
+      const data = await res.json();
+      if (!cancelled) {
+        setLearner(data.learner);
+        setLoading(false);
+      }
+    }
+
+    loadLearner();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(() => {
+      loadLearner();
+    });
+
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  async function signOut() {
+    const supabase = createBrowserSupabaseClient();
+    await supabase.auth.signOut();
+    setLearner(null);
   }
-  return cachedLearner;
-}
 
-export function getLearnerSnapshot(): Learner | null {
-  return readSnapshot();
-}
-
-export function getLearnerServerSnapshot(): Learner | null {
-  return null; // no localStorage during SSR
-}
-
-export function subscribeLearner(onChange: () => void): () => void {
-  window.addEventListener('storage', onChange);
-  return () => window.removeEventListener('storage', onChange);
-}
-
-export function storeLearner(learner: Learner) {
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(learner));
-  cachedRaw = null; // invalidate cache; storage events don't fire in the tab that wrote them
-}
-
-export async function registerLearner(input: {
-  firstName: string;
-  lastName: string;
-  email: string;
-}): Promise<Learner> {
-  const res = await fetch('/api/learner', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(input),
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body.error ?? `Failed to register (${res.status})`);
-  }
-  const data = await res.json();
-  const learner: Learner = { id: data.id, firstName: data.first_name, lastName: data.last_name, email: data.email };
-  storeLearner(learner);
-  return learner;
+  return { learner, loading, signOut };
 }

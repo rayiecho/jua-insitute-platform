@@ -1,6 +1,7 @@
 import { AccessToken, AgentDispatchClient, RoomServiceClient } from 'livekit-server-sdk';
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
 
 const AGENT_NAME = 'ai-tutor'; // must match ServerOptions.agentName in apps/agent/src/index.ts
 
@@ -17,18 +18,37 @@ const AGENT_NAME = 'ai-tutor'; // must match ServerOptions.agentName in apps/age
 // for this room/learner (Section 4.4 continuity) so the agent's opening
 // context query has real data instead of coming up empty.
 //
-// TODO(Phase 2+): once auth exists, derive `identity` from the authenticated
-// platform_users row instead of accepting it from the client, and validate
-// the learner is actually allowed into `room` (their own scheduled session).
-// At that point dispatch/session creation likely moves to a real booking flow
-// instead of happening lazily here.
+// Identity comes from the real auth session now, not a client-supplied query
+// param — previously any caller could pass any learnerId and mint a token
+// impersonating them. `room` is still client-supplied but must match this
+// learner's own room, so a signed-in learner can't request a token for
+// someone else's room either.
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const room = searchParams.get('room');
-  const identity = searchParams.get('identity');
 
-  if (!room || !identity) {
-    return NextResponse.json({ error: 'room and identity query params are required' }, { status: 400 });
+  if (!room) {
+    return NextResponse.json({ error: 'room query param is required' }, { status: 400 });
+  }
+
+  const supabase = await createServerSupabaseClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: 'not signed in' }, { status: 401 });
+  }
+  if (room !== `learner-${user.id}`) {
+    return NextResponse.json({ error: 'cannot request a token for another learner\'s room' }, { status: 403 });
+  }
+
+  const identity = user.id;
+
+  const admin = createAdminClient();
+  const { data: anyEnrollment } = await admin.from('enrollments').select('id').eq('user_id', identity).limit(1);
+  if (!anyEnrollment || anyEnrollment.length === 0) {
+    return NextResponse.json({ error: 'not enrolled in a program yet' }, { status: 403 });
   }
 
   const apiKey = process.env.LIVEKIT_API_KEY;
