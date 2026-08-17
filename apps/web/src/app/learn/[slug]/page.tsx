@@ -150,7 +150,7 @@ export default async function LessonPage({ params }: { params: Promise<{ slug: s
     return (
       <>
         <SiteHeader />
-        <main className="mx-auto flex w-full max-w-6xl gap-10 px-6 py-10">
+        <main className="flex w-full gap-10 pl-8 pr-6 py-10">
           {sidebar}
           <div className="min-w-0 flex-1">
             <div className="rounded-2xl border border-border bg-card px-8 py-14 text-center">
@@ -176,7 +176,7 @@ export default async function LessonPage({ params }: { params: Promise<{ slug: s
       <>
         <SiteHeader />
         <LessonViewTracker courseId={node.course_id} nodeId={node.id} />
-        <main className="mx-auto flex w-full max-w-6xl gap-10 px-6 py-10">
+        <main className="flex w-full gap-10 pl-8 pr-6 py-10">
           {sidebar}
           <div className="min-w-0 flex-1">
             <QuizLesson title={node.title} questions={questions ?? []} nodeId={node.id} alreadyDone={isComplete} />
@@ -197,7 +197,7 @@ export default async function LessonPage({ params }: { params: Promise<{ slug: s
   const typeLabel = LESSON_TYPE_LABEL[node.lesson_type] ?? null;
 
   const article = (
-    <article className="max-w-none space-y-4 leading-relaxed text-ink [&_code]:rounded [&_code]:bg-card [&_code]:px-1 [&_code]:py-0.5 [&_h1]:font-serif [&_h1]:text-2xl [&_h1]:font-semibold [&_h2]:font-serif [&_h2]:mt-6 [&_h2]:text-xl [&_h2]:font-semibold [&_pre]:overflow-x-auto [&_pre]:rounded [&_pre]:bg-ink [&_pre]:p-4 [&_pre]:text-background">
+    <article className="max-w-3xl space-y-4 leading-relaxed text-ink [&_code]:rounded [&_code]:bg-card [&_code]:px-1 [&_code]:py-0.5 [&_h1]:font-serif [&_h1]:text-2xl [&_h1]:font-semibold [&_h2]:font-serif [&_h2]:mt-6 [&_h2]:text-xl [&_h2]:font-semibold [&_pre]:overflow-x-auto [&_pre]:rounded [&_pre]:bg-ink [&_pre]:p-4 [&_pre]:text-background">
       {typeLabel && (
         <span className="inline-block rounded-full bg-gold/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-gold-dark">
           {typeLabel}
@@ -223,7 +223,7 @@ export default async function LessonPage({ params }: { params: Promise<{ slug: s
       <SiteHeader />
       <LessonViewTracker courseId={node.course_id} nodeId={node.id} />
       {assignment ? (
-        <main className="mx-auto flex w-full max-w-7xl gap-10 px-6 py-10">
+        <main className="flex w-full gap-10 pl-8 pr-6 py-10">
           {sidebar}
           <div className="grid min-w-0 flex-1 grid-cols-1 gap-8 xl:grid-cols-2">
             <div>
@@ -236,7 +236,7 @@ export default async function LessonPage({ params }: { params: Promise<{ slug: s
           </div>
         </main>
       ) : (
-        <main className="mx-auto flex w-full max-w-6xl gap-10 px-6 py-10">
+        <main className="flex w-full gap-10 pl-8 pr-6 py-10">
           {sidebar}
           <div className="min-w-0 flex-1">
             {article}

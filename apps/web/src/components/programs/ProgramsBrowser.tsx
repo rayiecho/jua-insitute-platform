@@ -27,7 +27,7 @@ export function ProgramsBrowser({ programs }: { programs: Program[] }) {
   const selected = programs.find((p) => p.id === selectedId) ?? programs[0] ?? null;
 
   return (
-    <main className="mx-auto flex w-full max-w-6xl flex-1 gap-12 px-6 py-14">
+    <main className="flex w-full flex-1 gap-10 pl-8 pr-6 py-10">
       <aside className="w-64 shrink-0">
         <p className="px-3 text-xs font-semibold uppercase tracking-wide text-ink/50">Programs</p>
         <nav className="mt-3 flex flex-col gap-1">

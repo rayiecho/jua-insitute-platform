@@ -42,7 +42,7 @@ export default async function DashboardPage() {
   return (
     <>
       <SiteHeader />
-      <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-14">
+      <main className="w-full max-w-4xl flex-1 pl-8 pr-6 py-10">
         <h1 className="font-serif text-3xl font-semibold text-ink">Your programs</h1>
 
         {(!enrollments || enrollments.length === 0) && (
