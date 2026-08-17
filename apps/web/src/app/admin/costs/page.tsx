@@ -66,7 +66,7 @@ export default async function CostsPage() {
   const blendedPerHour = totalHours > 0 ? totalCost / totalHours : 0;
 
   return (
-    <main className="mx-auto w-full max-w-5xl px-6 py-10 text-ink">
+    <div className="w-full max-w-5xl text-ink">
       <h1 className="font-serif text-2xl font-semibold">Session cost monitoring</h1>
       <p className="mt-2 text-sm text-ink/60">
         Estimated from published vendor list prices at session close — not actual invoiced amounts. Target:{' '}
@@ -121,7 +121,7 @@ export default async function CostsPage() {
           </tbody>
         </table>
       </div>
-    </main>
+    </div>
   );
 }
 
