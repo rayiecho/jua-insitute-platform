@@ -1,20 +1,36 @@
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, SafeAreaView, StyleSheet, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { LoginScreen } from './src/screens/LoginScreen';
+import { LessonScreen } from './src/screens/LessonScreen';
+import { type Learner, getStoredLearner } from './src/lib/learner';
+
+const DEMO_LESSON_SLUG = 'variables-and-types';
 
 export default function App() {
+  const [learner, setLearner] = useState<Learner | null | undefined>(undefined); // undefined = not checked yet
+
+  useEffect(() => {
+    getStoredLearner().then(setLearner);
+  }, []);
+
   return (
-    <View style={styles.container}>
-      <Text>Open up App.tsx to start working on your app!</Text>
+    <SafeAreaView style={styles.safeArea}>
+      {learner === undefined ? (
+        <View style={styles.center}>
+          <ActivityIndicator />
+        </View>
+      ) : learner === null ? (
+        <LoginScreen onLoggedIn={setLearner} />
+      ) : (
+        <LessonScreen learner={learner} slug={DEMO_LESSON_SLUG} />
+      )}
       <StatusBar style="auto" />
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  safeArea: { flex: 1, backgroundColor: '#fff' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 });
