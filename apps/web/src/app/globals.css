@@ -1,11 +1,13 @@
 @import "tailwindcss";
 
+/* The brand is exactly three colors: white, black, brown-gold. One accent,
+   not a family of them — no separate "gold" vs "tan" hue, no dark-mode
+   variant. Simpler is correct here. */
 :root {
   --background: #ffffff;
-  --color-ink: #1c1810;
-  --color-gold: #c8862b;
-  --color-gold-dark: #a66c1e;
-  --color-tan: #8b6f47;
+  --color-ink: #141414;
+  --color-brand: #c8862b;
+  --color-brand-dark: #a66c1e;
   --color-card: #faf6ef;
   --color-border: #e8ddc9;
 }
@@ -13,29 +15,15 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--color-ink);
-  --color-gold: var(--color-gold);
-  --color-gold-dark: var(--color-gold-dark);
-  --color-tan: var(--color-tan);
   --color-ink: var(--color-ink);
+  --color-gold: var(--color-brand);
+  --color-gold-dark: var(--color-brand-dark);
+  --color-tan: var(--color-brand-dark);
   --color-card: var(--color-card);
   --color-border: var(--color-border);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-serif: var(--font-display);
-}
-
-/* --color-ink is the single text-color token used everywhere (text-ink) —
-   redefining it here, not just --background, is what makes body copy
-   actually flip to a light color in dark mode instead of staying
-   near-black-on-near-black. */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #17130f;
-    --color-ink: #f7f1e4;
-    --color-tan: #c9a876;
-    --color-card: #211c15;
-    --color-border: #332b1e;
-  }
 }
 
 body {
