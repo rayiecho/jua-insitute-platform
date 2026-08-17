@@ -1,6 +1,12 @@
 'use client';
 
-import { BarVisualizer, DisconnectButton, useVoiceAssistant, useLocalParticipant } from '@livekit/components-react';
+import {
+  BarVisualizer,
+  DisconnectButton,
+  StartAudio,
+  useVoiceAssistant,
+  useLocalParticipant,
+} from '@livekit/components-react';
 
 const AGENT_STATE_LABEL: Record<string, string> = {
   disconnected: 'Waiting to connect…',
@@ -26,6 +32,11 @@ export function TutorSessionUI() {
         barCount={7}
         style={{ width: '100%', height: 120 }}
       />
+
+      {/* Browsers block audio started without a direct click; this button is
+          invisible unless that's actually blocking playback, and hides itself
+          again once clicked. */}
+      <StartAudio label="Click to enable audio" className="rounded bg-amber-500 px-4 py-2 text-white" />
 
       <div className="flex gap-3">
         <button
