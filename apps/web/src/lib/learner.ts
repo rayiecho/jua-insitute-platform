@@ -22,11 +22,17 @@ export function useLearnerSession(): { learner: Learner | null; loading: boolean
     const supabase = createBrowserSupabaseClient();
 
     async function loadLearner() {
-      const res = await fetch('/api/me');
-      const data = await res.json();
-      if (!cancelled) {
-        setLearner(data.learner);
-        setLoading(false);
+      try {
+        const res = await fetch('/api/me');
+        const data = await res.json();
+        if (!cancelled) setLearner(data.learner);
+      } catch {
+        // Network hiccup, cold dev-server compile, etc. — fall through to
+        // "not signed in" rather than hanging on "Checking your session…"
+        // forever. A real session will resolve correctly on the next check.
+        if (!cancelled) setLearner(null);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     }
 
