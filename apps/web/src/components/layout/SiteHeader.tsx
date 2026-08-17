@@ -10,6 +10,9 @@ export function SiteHeader() {
           <Logo />
         </Link>
         <nav className="flex items-center gap-6 text-sm font-medium">
+          <Link href="/" className="text-ink/70 hover:text-ink">
+            Home
+          </Link>
           <Link href="/programs" className="text-ink/70 hover:text-ink">
             Programs
           </Link>
