@@ -87,16 +87,14 @@ async function ensureSessionCurriculumContext(room: string, userId: string) {
   }
   if (!session) return;
 
-  const { data: existingContext } = await supabase
-    .from('session_curriculum_context')
-    .select('id')
-    .eq('session_id', session.id)
-    .eq('user_id', userId)
-    .maybeSingle();
-  if (existingContext) return; // already linked — don't duplicate on repeat joins
-
+  // Room is one-per-learner and persistent (see apps/web/src/app/tutor/page.tsx),
+  // so a session/user pair repeats on every visit — we deliberately insert a
+  // fresh row each join rather than dedupe, so continuity reflects wherever
+  // the learner actually is *now*, not wherever they were on their first-ever
+  // tutor visit. continuity.ts already reads the most recent row by
+  // created_at, so older rows are just harmless history.
   const active = await resolveActiveNode(supabase, userId);
-  if (!active) return; // no curriculum seeded yet — nothing to link
+  if (!active) return; // not enrolled in a program yet — nothing to link
 
   await supabase.from('session_curriculum_context').insert({
     session_id: session.id,
@@ -110,24 +108,45 @@ async function resolveActiveNode(
   supabase: ReturnType<typeof createAdminClient>,
   userId: string,
 ): Promise<{ nodeId: string; assignmentId: string | null } | null> {
-  const { data: inProgress } = await supabase
-    .from('student_assignments_progress')
-    .select('assignment_id, assignment:course_assignments(node_id)')
+  // The learner's most recently touched enrollment decides which PROGRAM the
+  // tutor coaches on (Section 4.4) — no more guessing "the first course".
+  const { data: enrollment } = await supabase
+    .from('enrollments')
+    .select('course_id, last_viewed_node_id')
     .eq('user_id', userId)
-    .eq('grading_status', 'in_progress')
-    .order('updated_at', { ascending: false })
+    .order('last_viewed_at', { ascending: false, nullsFirst: false })
+    .order('enrolled_at', { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  const assignment = Array.isArray(inProgress?.assignment) ? inProgress.assignment[0] : inProgress?.assignment;
-  if (assignment?.node_id) {
-    return { nodeId: assignment.node_id, assignmentId: inProgress!.assignment_id };
+  if (!enrollment) return null; // hasn't enrolled in anything yet
+
+  // Within that program, prefer an assignment actually in progress.
+  const { data: inProgressRows } = await supabase
+    .from('student_assignments_progress')
+    .select('assignment_id, assignment:course_assignments(node_id, node:curriculum_nodes(course_id))')
+    .eq('user_id', userId)
+    .eq('grading_status', 'in_progress')
+    .order('updated_at', { ascending: false });
+
+  for (const row of inProgressRows ?? []) {
+    const assignment = Array.isArray(row.assignment) ? row.assignment[0] : row.assignment;
+    const node = Array.isArray(assignment?.node) ? assignment.node[0] : assignment?.node;
+    if (assignment?.node_id && node?.course_id === enrollment.course_id) {
+      return { nodeId: assignment.node_id, assignmentId: row.assignment_id };
+    }
   }
 
-  // Fall back to the first node of the (MVP: single) course.
+  // Otherwise, wherever they last read within this program.
+  if (enrollment.last_viewed_node_id) {
+    return { nodeId: enrollment.last_viewed_node_id, assignmentId: null };
+  }
+
+  // Enrolled but haven't opened a lesson yet — start of the program.
   const { data: firstNode } = await supabase
     .from('curriculum_nodes')
     .select('id')
+    .eq('course_id', enrollment.course_id)
     .order('sequence_order', { ascending: true })
     .limit(1)
     .maybeSingle();

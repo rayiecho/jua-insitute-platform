@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { SiteHeader } from '@/components/layout/SiteHeader';
+import { EnrollAndStartButton } from '@/components/programs/EnrollAndStartButton';
 
 export default async function ProgramPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -34,12 +35,11 @@ export default async function ProgramPage({ params }: { params: Promise<{ slug: 
         <p className="mt-4 text-ink/70">{course.description}</p>
 
         {firstNode && (
-          <Link
-            href={`/learn/${firstNode.slug}`}
+          <EnrollAndStartButton
+            courseId={course.id}
+            firstLessonHref={`/learn/${firstNode.slug}`}
             className="mt-8 inline-flex items-center rounded bg-gold px-6 py-3 text-sm font-semibold text-ink"
-          >
-            Start the program
-          </Link>
+          />
         )}
 
         {nodes && nodes.length > 0 && (

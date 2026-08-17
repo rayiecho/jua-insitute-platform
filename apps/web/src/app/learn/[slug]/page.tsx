@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { AssignmentPanel } from '@/components/tutor/AssignmentPanel';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { YouTubeEmbed } from '@/components/programs/YouTubeEmbed';
+import { LessonViewTracker } from '@/components/programs/LessonViewTracker';
 
 // Curriculum content is public read data with no learner-specific access rule,
 // but this project's Supabase instance has RLS on with no policies defined yet
@@ -18,7 +19,7 @@ export default async function LessonPage({ params }: { params: Promise<{ slug: s
 
   const { data: node } = await supabase
     .from('curriculum_nodes')
-    .select('id, title, markdown_content, video_url')
+    .select('id, course_id, title, markdown_content, video_url')
     .eq('slug', slug)
     .maybeSingle();
 
@@ -34,6 +35,7 @@ export default async function LessonPage({ params }: { params: Promise<{ slug: s
   return (
     <>
       <SiteHeader />
+      <LessonViewTracker courseId={node.course_id} nodeId={node.id} />
       <main className="mx-auto grid w-full max-w-6xl grid-cols-1 gap-8 px-6 py-10 lg:grid-cols-2">
         <article
           className="max-w-none space-y-4 leading-relaxed text-ink [&_code]:rounded [&_code]:bg-card [&_code]:px-1 [&_code]:py-0.5 [&_h1]:font-serif [&_h1]:text-2xl [&_h1]:font-semibold [&_h2]:font-serif [&_h2]:mt-6 [&_h2]:text-xl [&_h2]:font-semibold [&_pre]:overflow-x-auto [&_pre]:rounded [&_pre]:bg-ink [&_pre]:p-4 [&_pre]:text-background"

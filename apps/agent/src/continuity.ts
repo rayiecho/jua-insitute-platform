@@ -21,12 +21,27 @@ export async function buildOpeningContext(learnerId: string): Promise<OpeningCon
   if (curriculumContext?.sessionSummary) {
     parts.push(`Last session summary: ${curriculumContext.sessionSummary}`);
   }
-  if (curriculumContext?.nodeTitle) {
+  if (curriculumContext?.courseTitle) {
     parts.push(
-      `The learner's current curriculum lesson is "${curriculumContext.nodeTitle}"${
-        curriculumContext.assignmentTitle ? `, working on the assignment "${curriculumContext.assignmentTitle}"` : ''
-      }. Teach from this lesson unless the learner asks to move on.`,
+      `The learner is enrolled in the "${curriculumContext.courseTitle}" program. Coach them on this program only — do not teach unrelated topics.`,
     );
+  }
+  if (curriculumContext?.nodeContent) {
+    parts.push(
+      `Lesson material for "${curriculumContext.nodeTitle}" — this is the learner's actual curriculum on the platform. Teach directly from it, in your own spoken words, rather than substituting your own general knowledge of the topic:\n\n${curriculumContext.nodeContent}`,
+    );
+  } else if (curriculumContext?.nodeTitle) {
+    parts.push(`The learner's current curriculum lesson is "${curriculumContext.nodeTitle}".`);
+  }
+  if (curriculumContext?.assignmentInstructions) {
+    parts.push(
+      `The learner's current assignment, "${curriculumContext.assignmentTitle}":\n\n${curriculumContext.assignmentInstructions}`,
+    );
+  } else if (curriculumContext?.assignmentTitle) {
+    parts.push(`They're also working on the assignment "${curriculumContext.assignmentTitle}".`);
+  }
+  if (curriculumContext?.nodeTitle || curriculumContext?.assignmentTitle) {
+    parts.push('Stay with this lesson unless the learner explicitly asks to move on.');
   }
   if (progress) {
     parts.push(
@@ -67,15 +82,18 @@ async function fetchInProgressAssignment(learnerId: string) {
 
 interface CurrentCurriculumContext {
   sessionSummary: string | null;
+  courseTitle: string | null;
   nodeTitle: string | null;
+  nodeContent: string | null;
   assignmentTitle: string | null;
+  assignmentInstructions: string | null;
 }
 
 async function fetchCurrentCurriculumContext(learnerId: string): Promise<CurrentCurriculumContext | null> {
   const { data } = await supabase
     .from('session_curriculum_context')
     .select(
-      'session_summary, node:curriculum_nodes!active_node_id(title), assignment:course_assignments!active_assignment_id(title)',
+      'session_summary, node:curriculum_nodes!active_node_id(title, markdown_content, course:courses(title)), assignment:course_assignments!active_assignment_id(title, instructions_markdown)',
     )
     .eq('user_id', learnerId)
     .order('created_at', { ascending: false })
@@ -84,11 +102,15 @@ async function fetchCurrentCurriculumContext(learnerId: string): Promise<Current
 
   if (!data) return null;
   const node = Array.isArray(data.node) ? data.node[0] : data.node;
+  const course = Array.isArray(node?.course) ? node.course[0] : node?.course;
   const assignment = Array.isArray(data.assignment) ? data.assignment[0] : data.assignment;
   return {
     sessionSummary: data.session_summary ?? null,
+    courseTitle: course?.title ?? null,
     nodeTitle: node?.title ?? null,
+    nodeContent: node?.markdown_content ?? null,
     assignmentTitle: assignment?.title ?? null,
+    assignmentInstructions: assignment?.instructions_markdown ?? null,
   };
 }
 
