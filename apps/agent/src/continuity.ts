@@ -6,25 +6,16 @@ export interface OpeningContext {
   preparedVideo: { title: string; url: string } | null;
 }
 
-// Section 4.4 — "Pick up where we left off". Runs once at session start, before
-// the tutor speaks. Memory search needs to know the current lesson first (it
-// searches *against* that), so curriculum context is fetched before it rather
-// than in the same parallel batch as the other two, independent, queries.
+// Section 4.4 — "Pick up where we left off". Runs once at session start,
+// before the tutor speaks.
 export async function buildOpeningContext(learnerId: string): Promise<OpeningContext> {
   const curriculumContext = await fetchCurrentCurriculumContext(learnerId);
   const memoryQuery = curriculumContext?.nodeContent ?? curriculumContext?.nodeTitle ?? null;
-
-  const [progress, memories] = await Promise.all([
-    fetchInProgressAssignment(learnerId),
-    fetchRelevantMemories(learnerId, memoryQuery),
-  ]);
+  const memories = await fetchRelevantMemories(learnerId, memoryQuery);
 
   const parts: string[] = [
     'You are a 1-on-1 AI tutor picking up an ongoing relationship with this learner.',
   ];
-  if (curriculumContext?.sessionSummary) {
-    parts.push(`Last session summary: ${curriculumContext.sessionSummary}`);
-  }
   if (curriculumContext?.courseTitle) {
     parts.push(
       `The learner is enrolled in the "${curriculumContext.courseTitle}" program. Coach them on this program only — do not teach unrelated topics.`,
@@ -52,25 +43,20 @@ export async function buildOpeningContext(learnerId: string): Promise<OpeningCon
       `A short video for this lesson is prepared and will be shared in the room automatically. Mention early in the session that you've prepared a video on this topic and that they can watch it in the session guide panel.`,
     );
   }
-  if (progress) {
-    parts.push(
-      `Current assignment in progress: "${progress.title}" (status: ${progress.grading_status}).`,
-    );
-  }
   if (memories.length > 0) {
     parts.push(`Relevant long-term context:\n${memories.map((m) => `- ${m}`).join('\n')}`);
   }
   parts.push(
-    'Open the session by briefly acknowledging where the learner left off — do not greet them as a stranger.',
+    curriculumContext?.nodeTitle
+      ? 'Open the session by briefly acknowledging where the learner left off — do not greet them as a stranger.'
+      : "The learner hasn't started a program yet — welcome them and ask what they'd like to focus on.",
   );
 
   return {
     systemPrompt: parts.join('\n\n'),
-    openingLine: curriculumContext?.sessionSummary
-      ? 'Welcome the learner back and reference what they were working on last time.'
-      : curriculumContext?.nodeTitle
-        ? `Welcome the learner and confirm you're picking up with "${curriculumContext.nodeTitle}".`
-        : 'Welcome the learner and ask what they would like to focus on first.',
+    openingLine: curriculumContext?.nodeTitle
+      ? `Welcome the learner and confirm you're picking up with "${curriculumContext.nodeTitle}".`
+      : 'Welcome the learner and ask what they would like to focus on first.',
     preparedVideo:
       curriculumContext?.videoUrl && curriculumContext.nodeTitle
         ? { title: curriculumContext.nodeTitle, url: curriculumContext.videoUrl }
@@ -78,23 +64,7 @@ export async function buildOpeningContext(learnerId: string): Promise<OpeningCon
   };
 }
 
-async function fetchInProgressAssignment(learnerId: string) {
-  const { data } = await supabase
-    .from('student_assignments_progress')
-    .select('grading_status, assignment:course_assignments(title)')
-    .eq('user_id', learnerId)
-    .eq('grading_status', 'in_progress')
-    .order('updated_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (!data) return null;
-  const assignment = Array.isArray(data.assignment) ? data.assignment[0] : data.assignment;
-  return { title: assignment?.title ?? 'untitled assignment', grading_status: data.grading_status };
-}
-
 interface CurrentCurriculumContext {
-  sessionSummary: string | null;
   courseTitle: string | null;
   nodeTitle: string | null;
   nodeContent: string | null;
@@ -103,29 +73,92 @@ interface CurrentCurriculumContext {
   assignmentInstructions: string | null;
 }
 
+// Derived FRESH from the learner's actual enrollment every call — mirrors
+// resolveActiveNode in apps/web/src/app/api/livekit-token/route.ts, rather
+// than reading session_curriculum_context's historical "most recent row"
+// (the previous approach). That history table only ever gets a new row
+// when a learner is enrolled; for anyone without a current enrollment it
+// writes nothing, which meant the "most recent row ever" could silently be
+// a stale row from an entirely different course — confirmed live
+// 2026-08-17, where the tutor referenced "Variables and Types" (a
+// pre-enrollment-era Python demo row) for a learner who was actually
+// enrolled in and working through Entrepreneurship. Computing this fresh
+// each time makes that class of bug structurally impossible: there's no
+// history to go stale.
 async function fetchCurrentCurriculumContext(learnerId: string): Promise<CurrentCurriculumContext | null> {
-  const { data } = await supabase
-    .from('session_curriculum_context')
-    .select(
-      'session_summary, node:curriculum_nodes!active_node_id(title, markdown_content, video_url, course:courses(title)), assignment:course_assignments!active_assignment_id(title, instructions_markdown)',
-    )
+  const { data: enrollment } = await supabase
+    .from('enrollments')
+    .select('course_id, last_viewed_node_id, course:courses(title)')
     .eq('user_id', learnerId)
-    .order('created_at', { ascending: false })
+    .order('last_viewed_at', { ascending: false, nullsFirst: false })
+    .order('enrolled_at', { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  if (!data) return null;
-  const node = Array.isArray(data.node) ? data.node[0] : data.node;
-  const course = Array.isArray(node?.course) ? node.course[0] : node?.course;
-  const assignment = Array.isArray(data.assignment) ? data.assignment[0] : data.assignment;
+  if (!enrollment) return null; // not enrolled in anything — nothing to teach from
+  const course = Array.isArray(enrollment.course) ? enrollment.course[0] : enrollment.course;
+  const courseTitle = course?.title ?? null;
+
+  // Prefer an assignment actually in progress within THIS course.
+  const { data: inProgressRows } = await supabase
+    .from('student_assignments_progress')
+    .select(
+      'assignment:course_assignments(title, instructions_markdown, node:curriculum_nodes(title, markdown_content, video_url, course_id))',
+    )
+    .eq('user_id', learnerId)
+    .eq('grading_status', 'in_progress')
+    .order('updated_at', { ascending: false });
+
+  for (const row of inProgressRows ?? []) {
+    const assignment = Array.isArray(row.assignment) ? row.assignment[0] : row.assignment;
+    const node = Array.isArray(assignment?.node) ? assignment.node[0] : assignment?.node;
+    if (node?.course_id === enrollment.course_id) {
+      return {
+        courseTitle,
+        nodeTitle: node.title,
+        nodeContent: node.markdown_content,
+        videoUrl: node.video_url,
+        assignmentTitle: assignment?.title ?? null,
+        assignmentInstructions: assignment?.instructions_markdown ?? null,
+      };
+    }
+  }
+
+  // Otherwise, wherever they last read within this program.
+  if (enrollment.last_viewed_node_id) {
+    const { data: node } = await supabase
+      .from('curriculum_nodes')
+      .select('title, markdown_content, video_url')
+      .eq('id', enrollment.last_viewed_node_id)
+      .maybeSingle();
+    if (node) {
+      return {
+        courseTitle,
+        nodeTitle: node.title,
+        nodeContent: node.markdown_content,
+        videoUrl: node.video_url,
+        assignmentTitle: null,
+        assignmentInstructions: null,
+      };
+    }
+  }
+
+  // Enrolled but haven't opened a lesson yet — start of the program.
+  const { data: firstNode } = await supabase
+    .from('curriculum_nodes')
+    .select('title, markdown_content, video_url')
+    .eq('course_id', enrollment.course_id)
+    .order('sequence_order', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
   return {
-    sessionSummary: data.session_summary ?? null,
-    courseTitle: course?.title ?? null,
-    nodeTitle: node?.title ?? null,
-    nodeContent: node?.markdown_content ?? null,
-    videoUrl: node?.video_url ?? null,
-    assignmentTitle: assignment?.title ?? null,
-    assignmentInstructions: assignment?.instructions_markdown ?? null,
+    courseTitle,
+    nodeTitle: firstNode?.title ?? null,
+    nodeContent: firstNode?.markdown_content ?? null,
+    videoUrl: firstNode?.video_url ?? null,
+    assignmentTitle: null,
+    assignmentInstructions: null,
   };
 }
 
