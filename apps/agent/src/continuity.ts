@@ -10,8 +10,7 @@ export interface OpeningContext {
 // before the tutor speaks.
 export async function buildOpeningContext(learnerId: string): Promise<OpeningContext> {
   const curriculumContext = await fetchCurrentCurriculumContext(learnerId);
-  const memoryQuery = curriculumContext?.nodeContent ?? curriculumContext?.nodeTitle ?? null;
-  const memories = await fetchRelevantMemories(learnerId, memoryQuery);
+  const memories = await fetchRecentSessionSummaries(learnerId);
 
   const parts: string[] = [
     'You are a 1-on-1 AI tutor picking up an ongoing relationship with this learner.',
@@ -57,7 +56,9 @@ export async function buildOpeningContext(learnerId: string): Promise<OpeningCon
     );
   }
   if (memories.length > 0) {
-    parts.push(`Relevant long-term context:\n${memories.map((m) => `- ${m}`).join('\n')}`);
+    parts.push(
+      `What actually happened in your last live sessions with this learner, most recent first:\n${memories.map((m) => `- ${m}`).join('\n')}\n\nOpen by referencing something SPECIFIC from this — not a generic "welcome back" — so the learner can tell you genuinely remember the conversation, not just their curriculum position.`,
+    );
   }
   parts.push(
     curriculumContext?.nodeTitle
@@ -215,22 +216,41 @@ async function fetchCurrentCurriculumContext(learnerId: string): Promise<Current
   };
 }
 
-async function fetchRelevantMemories(learnerId: string, _queryText: string | null): Promise<string[]> {
-  // TEMPORARILY DISABLED (2026-08-17): embedText() (apps/agent/src/embeddings.ts)
-  // hung tutor sessions on session start TWICE in production, including after
-  // adding a 4s Promise.race timeout around it — meaning the hang is very
-  // likely a *synchronous* blocking call inside onnxruntime-node's native
-  // model-init addon, which can starve the event loop badly enough that even
-  // an independent setTimeout callback never gets a turn to fire. A JS-level
-  // timeout can't protect against that; only real thread/process isolation
-  // (e.g. running the model in a worker_thread) can. Reverted to the
-  // recency-based fallback unconditionally until that's built and verified —
-  // reliable live tutoring matters far more than semantic memory ranking.
+// Real cross-session memory, without the disabled embedding pipeline.
+// lesson_memory_vectors (semantic search) is intentionally not written to
+// right now (see compaction.ts's matching note — embedText() hung
+// production twice via a synchronous onnxruntime-node call) so reading from
+// it, as this used to, returned an empty table in practice: infrastructure
+// that looked real but had nothing behind it.
+//
+// conversation_summaries is different — CompactionManager genuinely writes
+// to it mid-session once a live class's conversation crosses ~3000
+// estimated tokens (compaction.ts). Since a learner's LiveKit room is
+// persistent and one-per-learner (`learner-${learnerId}`, see
+// apps/web/src/app/api/livekit-token/route.ts), classroom_sessions has (at
+// most) one row per learner, and every summary from every past class they've
+// had links to it — reading the most recent ones is a genuine "what did we
+// actually talk about last time," not a recency-only stand-in.
+//
+// Caveat: a class that ends before crossing the token threshold produces no
+// summary at all — this only has something to say once at least one class
+// has run long enough to compact. That's expected to be the normal case at
+// the current 45-minute class length, not the exception.
+async function fetchRecentSessionSummaries(learnerId: string): Promise<string[]> {
+  const { data: sessionRow } = await supabase
+    .from('classroom_sessions')
+    .select('id')
+    .eq('room_name', `learner-${learnerId}`)
+    .maybeSingle();
+
+  if (!sessionRow) return [];
+
   const { data } = await supabase
-    .from('lesson_memory_vectors')
+    .from('conversation_summaries')
     .select('summary_text')
-    .eq('user_id', learnerId)
+    .eq('session_id', sessionRow.id)
     .order('created_at', { ascending: false })
     .limit(5);
+
   return (data ?? []).map((row) => row.summary_text);
 }

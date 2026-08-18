@@ -4,6 +4,7 @@ import "./globals.css";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { AuthHashHandler } from "@/components/auth/AuthHashHandler";
 import { AuthErrorBanner } from "@/components/auth/AuthErrorBanner";
+import { ChatWidget } from "@/components/assistant/ChatWidget";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
