@@ -19,7 +19,11 @@ export async function POST() {
   }
 
   const admin = createAdminClient();
-  const { redirectTo } = await provisionAndVerify(admin, user);
+  const { redirectTo, error } = await provisionAndVerify(admin, user);
+
+  if (error) {
+    return NextResponse.json({ error }, { status: 500 });
+  }
 
   return NextResponse.json({ redirectTo });
 }

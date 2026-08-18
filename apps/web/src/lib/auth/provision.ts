@@ -18,12 +18,35 @@ import type { SupabaseClient, User } from '@supabase/supabase-js';
 // Returns where the browser should land: the first lesson of the
 // just-enrolled program, or the dashboard for a returning/already-enrolled
 // learner.
-export async function provisionAndVerify(admin: SupabaseClient, user: User): Promise<{ redirectTo: string }> {
+export async function provisionAndVerify(
+  admin: SupabaseClient,
+  user: User,
+): Promise<{ redirectTo: string; error?: string }> {
   const { data: existing } = await admin
     .from('platform_users')
     .select('id, email_verified')
     .eq('id', user.id)
     .maybeSingle();
+
+  // platform_users.id is assumed to equal auth.users.id everywhere in this
+  // app (see /api/me and friends). That assumption breaks if the auth user
+  // was ever deleted and recreated for the same email (e.g. during manual
+  // testing) — the old profile row survives under an id no live session
+  // will ever match again, so `existing` above comes back null even though
+  // a row for this email exists, and inserting a fresh one below would hit
+  // the email unique constraint. Reconcile by dropping the stale row (its
+  // children all cascade-delete) before proceeding — self-healing instead
+  // of failing silently a second time.
+  if (!existing && user.email) {
+    const { data: staleByEmail } = await admin
+      .from('platform_users')
+      .select('id')
+      .eq('email', user.email)
+      .maybeSingle();
+    if (staleByEmail) {
+      await admin.from('platform_users').delete().eq('id', staleByEmail.id);
+    }
+  }
 
   const { data: application } = await admin
     .from('enrollment_applications')
@@ -45,7 +68,7 @@ export async function provisionAndVerify(admin: SupabaseClient, user: User): Pro
       lastName = rest.join(' ');
     }
 
-    await admin.from('platform_users').insert({
+    const { error: insertError } = await admin.from('platform_users').insert({
       id: user.id,
       email: user.email,
       first_name: firstName || 'there',
@@ -55,8 +78,13 @@ export async function provisionAndVerify(admin: SupabaseClient, user: User): Pro
       commitment_hours: application?.commitment_hours ?? null,
       interests: application?.interests ?? null,
     });
+    if (insertError) return { redirectTo: '/dashboard', error: insertError.message };
   } else if (!existing.email_verified) {
-    await admin.from('platform_users').update({ email_verified: true }).eq('id', user.id);
+    const { error: updateError } = await admin
+      .from('platform_users')
+      .update({ email_verified: true })
+      .eq('id', user.id);
+    if (updateError) return { redirectTo: '/dashboard', error: updateError.message };
   }
 
   let redirectTo = '/dashboard';
