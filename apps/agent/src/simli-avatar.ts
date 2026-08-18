@@ -115,15 +115,18 @@ export class SimliAvatarSession extends voice.AvatarSession {
       throw new SimliException(`Simli /compose/token failed (${tokenRes.status}): ${await tokenRes.text()}`);
     }
     const { session_token: sessionToken } = (await tokenRes.json()) as { session_token: string };
+    console.log('[simli] compose/token ok');
 
     const joinRes = await fetch(`${this.apiUrl}/integrations/livekit/agents`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ session_token: sessionToken, livekit_token: livekitToken, livekit_url: livekitUrl }),
     });
+    const joinBody = await joinRes.text();
     if (!joinRes.ok) {
-      throw new SimliException(`Simli LiveKit join failed (${joinRes.status}): ${await joinRes.text()}`);
+      throw new SimliException(`Simli LiveKit join failed (${joinRes.status}): ${joinBody}`);
     }
+    console.log('[simli] integrations/livekit/agents response:', joinBody);
 
     agentSession.output.audio = new voice.DataStreamAudioOutput({
       room,

@@ -38,6 +38,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <AuthHashHandler />
         {children}
         <SiteFooter />
+        <ChatWidget />
       </body>
     </html>
   );

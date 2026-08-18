@@ -13,6 +13,7 @@ import {
 import * as openai from '@livekit/agents-plugin-openai';
 import * as deepgram from '@livekit/agents-plugin-deepgram';
 import * as silero from '@livekit/agents-plugin-silero';
+import { TrackPublishOptions, TrackSource } from '@livekit/rtc-node';
 
 import { buildOpeningContext } from './continuity.js';
 import { StateInjector } from './state-injection.js';
@@ -132,13 +133,39 @@ export default defineAgent({
     // CLASS_DURATION_MINUTES so Simli's own session timer matches the
     // room-level one below rather than cutting the avatar off mid-class at
     // its 10-minute default.
+    //
+    // avatar.start() itself only confirms Simli's API *accepted* the join
+    // request (confirmed live: it returns 200 "Agent Successfully Joined"
+    // immediately) — it does NOT confirm Simli's avatar actually finished
+    // connecting and publishing video. Confirmed live 2026-08-18: a real
+    // class hung indefinitely on "Thinking…" with no avatar and no audio,
+    // because output.audio was already pointed at the avatar's
+    // DataStreamAudioOutput (see simli-avatar.ts) and nothing was ever on
+    // the other end to receive and relay it back into the room — every
+    // spoken reply vanished into a dead end instead of falling back to
+    // normal voice. waitForJoin() is the only way to actually confirm the
+    // avatar is live; on timeout, output.audio is rebuilt as a normal
+    // direct-publish output (the exact defaults RoomIO itself uses — see
+    // node_modules/@livekit/agents/dist/voice/room_io/room_io.js) so the
+    // class degrades to voice-only instead of going silent.
     const simliFaceId = process.env.SIMLI_FACE_ID;
     if (simliFaceId) {
       const avatar = new SimliAvatarSession({
         faceId: simliFaceId,
         maxSessionLengthSeconds: CLASS_DURATION_MINUTES * 60,
       });
-      await avatar.start(session, ctx.room);
+      try {
+        await avatar.start(session, ctx.room);
+        await avatar.waitForJoin({ timeout: 15000 });
+        console.log('[simli] avatar joined and publishing');
+      } catch (err) {
+        console.error('[simli] avatar failed to join in time, falling back to voice-only:', err);
+        session.output.audio = new voice.ParticipantAudioOutput(ctx.room, {
+          sampleRate: 24000,
+          numChannels: 1,
+          trackPublishOptions: new TrackPublishOptions({ source: TrackSource.SOURCE_MICROPHONE }),
+        });
+      }
     }
 
     await session.start({
