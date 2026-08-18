@@ -76,9 +76,9 @@ export default async function ProgramPage({ params }: { params: Promise<{ slug: 
   return (
     <>
       <SiteHeader />
-      <main className="w-full max-w-3xl flex-1 pl-8 pr-6 py-10">
+      <main className="w-full max-w-3xl flex-1 px-4 py-8 sm:px-8 sm:py-10">
         <span className="text-xs font-semibold tracking-wide text-tan uppercase">{course.difficulty_level}</span>
-        <h1 className="mt-2 font-serif text-4xl font-semibold text-ink">{course.title}</h1>
+        <h1 className="mt-2 font-serif text-3xl font-semibold text-ink sm:text-4xl">{course.title}</h1>
         {course.tagline && <p className="mt-2 text-lg text-ink/70">{course.tagline}</p>}
         <p className="mt-4 text-ink/70">{course.description}</p>
 

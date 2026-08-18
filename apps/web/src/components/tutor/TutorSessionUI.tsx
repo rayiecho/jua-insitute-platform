@@ -93,7 +93,7 @@ export function TutorSessionUI({ learner }: { learner: Learner }) {
   return (
     <ClassroomShell>
       <main className="flex min-h-screen flex-col">
-        <div className="flex items-center justify-between border-b border-border px-6 py-4">
+        <div className="flex items-center justify-between border-b border-border px-3 py-3 sm:px-6 sm:py-4">
           <div className="flex items-center gap-2 text-sm text-ink/60">
             <LogoMark className="h-5 w-5" />
             <span>Live class</span>
@@ -104,7 +104,7 @@ export function TutorSessionUI({ learner }: { learner: Learner }) {
           </span>
         </div>
 
-        <div className="relative flex flex-1 items-center justify-center overflow-hidden p-6">
+        <div className="relative flex flex-1 items-center justify-center overflow-hidden p-3 sm:p-6">
           {screenShareTrack ? (
             <div className="aspect-video w-full max-w-4xl overflow-hidden rounded-2xl border border-border bg-ink shadow-sm">
               <VideoTrack trackRef={screenShareTrack} className="h-full w-full" />
@@ -133,7 +133,7 @@ export function TutorSessionUI({ learner }: { learner: Learner }) {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center justify-center gap-2 border-t border-border px-6 py-5">
+        <div className="flex flex-wrap items-center justify-center gap-2 border-t border-border px-3 py-4 sm:px-6 sm:py-5">
           <StartAudio
             label="Click to enable audio"
             className="rounded bg-gold px-4 py-2 text-sm font-semibold text-ink"
@@ -227,7 +227,7 @@ function TutorTile({
     state === 'speaking' ? 'ring-gold' : state === 'listening' ? 'ring-gold/40' : 'ring-transparent';
 
   return (
-    <div className="flex w-full max-w-xl flex-col items-center gap-6 rounded-2xl border border-border bg-card px-10 py-14 shadow-sm">
+    <div className="flex w-full max-w-xl flex-col items-center gap-6 rounded-2xl border border-border bg-card px-6 py-10 shadow-sm sm:px-10 sm:py-14">
       <div
         className={`flex h-28 w-28 items-center justify-center rounded-full bg-background ring-4 transition-all ${ringClass}`}
       >
@@ -261,7 +261,7 @@ function LearnerTile({
   const initial = learner.firstName.charAt(0).toUpperCase();
 
   return (
-    <div className="absolute bottom-8 right-8 flex h-32 w-44 flex-col overflow-hidden rounded-xl border border-border bg-ink shadow-sm">
+    <div className="absolute bottom-3 right-3 flex h-20 w-28 flex-col overflow-hidden rounded-xl border border-border bg-ink shadow-sm sm:bottom-8 sm:right-8 sm:h-32 sm:w-44">
       {cameraTrack ? (
         <VideoTrack trackRef={cameraTrack} className="h-full w-full object-cover" />
       ) : (

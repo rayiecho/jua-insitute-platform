@@ -27,10 +27,10 @@ export function ProgramsBrowser({ programs }: { programs: Program[] }) {
   const selected = programs.find((p) => p.id === selectedId) ?? programs[0] ?? null;
 
   return (
-    <main className="flex w-full flex-1 gap-10 pl-8 pr-6 py-10">
-      <aside className="w-64 shrink-0">
-        <p className="px-3 text-xs font-semibold uppercase tracking-wide text-ink/50">Programs</p>
-        <nav className="mt-3 flex flex-col gap-1">
+    <main className="flex w-full flex-1 flex-col gap-6 px-4 py-8 sm:px-6 md:flex-row md:gap-10 md:px-8 md:py-10">
+      <aside className="shrink-0 md:w-64">
+        <p className="px-1 text-xs font-semibold uppercase tracking-wide text-ink/50 md:px-3">Programs</p>
+        <nav className="mt-3 flex gap-2 overflow-x-auto pb-1 md:flex-col md:overflow-visible md:pb-0">
           {programs.map((program) => {
             const isSelected = program.id === selected?.id;
             return (
@@ -38,11 +38,13 @@ export function ProgramsBrowser({ programs }: { programs: Program[] }) {
                 key={program.id}
                 type="button"
                 onClick={() => setSelectedId(program.id)}
-                className={`flex flex-col items-start rounded-lg border px-4 py-3 text-left transition-colors ${
+                className={`flex shrink-0 flex-col items-start rounded-lg border px-4 py-3 text-left transition-colors ${
                   isSelected ? 'border-gold bg-gold/10' : 'border-transparent text-ink/70 hover:bg-card'
                 }`}
               >
-                <span className={`text-sm font-medium ${isSelected ? 'text-ink' : ''}`}>{program.title}</span>
+                <span className={`whitespace-nowrap text-sm font-medium ${isSelected ? 'text-ink' : ''}`}>
+                  {program.title}
+                </span>
                 <span className="mt-0.5 text-xs text-ink/50">
                   {program.status === 'live' ? 'Live now' : 'Coming soon'}
                 </span>
@@ -55,11 +57,11 @@ export function ProgramsBrowser({ programs }: { programs: Program[] }) {
       {selected && (
         <section className="min-w-0 flex-1">
           {/* Header band — fills the space instead of a lone text stack. */}
-          <div className="rounded-2xl border border-border bg-card px-10 py-12">
+          <div className="rounded-2xl border border-border bg-card px-6 py-8 sm:px-10 sm:py-12">
             <span className="text-xs font-semibold tracking-wide text-tan uppercase">
               {selected.difficulty_level}
             </span>
-            <h1 className="mt-2 font-serif text-4xl font-semibold text-ink">{selected.title}</h1>
+            <h1 className="mt-2 font-serif text-3xl font-semibold text-ink sm:text-4xl">{selected.title}</h1>
             {selected.tagline && <p className="mt-3 max-w-xl text-lg text-ink/70">{selected.tagline}</p>}
             <p className="mt-4 max-w-2xl text-ink/70">{selected.description}</p>
 
@@ -83,7 +85,7 @@ export function ProgramsBrowser({ programs }: { programs: Program[] }) {
           </div>
 
           {/* Stats row */}
-          <div className="mt-6 grid grid-cols-3 gap-4">
+          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
             <Stat
               label="Duration"
               value={

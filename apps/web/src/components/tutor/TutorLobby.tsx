@@ -117,7 +117,7 @@ export function TutorLobby() {
         )}
 
         {status === 'not_verified' && (
-          <div className="mt-8 flex w-full flex-col items-center gap-4 rounded-2xl border border-border bg-card px-8 py-10 text-center shadow-sm">
+          <div className="mt-8 flex w-full flex-col items-center gap-4 rounded-2xl border border-border bg-card px-6 py-10 text-center shadow-sm sm:px-8">
             <p className="font-serif text-xl font-semibold text-ink">Almost there</p>
             <p className="text-sm text-ink/60">We found your application — just verify your email to continue.</p>
             <OtpVerifyForm
@@ -151,7 +151,7 @@ export function TutorLobby() {
         )}
 
         {status === 'ready' && (
-          <div className="mt-8 flex w-full flex-col items-center gap-4 rounded-2xl border border-border bg-card px-8 py-10 text-center shadow-sm">
+          <div className="mt-8 flex w-full flex-col items-center gap-4 rounded-2xl border border-border bg-card px-6 py-10 text-center shadow-sm sm:px-8">
             <p className="font-serif text-xl font-semibold text-ink">Ready, {resolvedFirstName}?</p>
             <p className="text-sm text-ink/60">Your tutor will be with you as soon as you join.</p>
             <button
@@ -182,7 +182,7 @@ function NoticeCard({
   onBack: () => void;
 }) {
   return (
-    <div className="mt-8 flex w-full flex-col items-center gap-4 rounded-2xl border border-border bg-card px-8 py-10 text-center shadow-sm">
+    <div className="mt-8 flex w-full flex-col items-center gap-4 rounded-2xl border border-border bg-card px-6 py-10 text-center shadow-sm sm:px-8">
       <p className="font-serif text-xl font-semibold text-ink">{title}</p>
       <p className="text-sm text-ink/60">{body}</p>
       {ctaHref && ctaLabel && (

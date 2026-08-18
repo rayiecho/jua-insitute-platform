@@ -7,7 +7,7 @@ export const metadata = {
 
 export default function TermsPage() {
   return (
-    <main className="pl-8 pr-6 py-16">
+    <main className="px-4 py-10 sm:px-8 sm:py-16">
       <div className="max-w-2xl">
         <Link href="/" className="inline-flex items-center gap-2 text-sm font-medium text-tan hover:text-ink">
           <LogoMark className="h-6 w-6" /> Jua Institute

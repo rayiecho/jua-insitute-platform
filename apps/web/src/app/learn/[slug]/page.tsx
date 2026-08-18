@@ -83,7 +83,7 @@ export default async function LessonPage({ params }: { params: Promise<{ slug: s
   const weekNodes = currentWeek ? flat.filter((n) => n.week_id === currentWeek.id) : [];
 
   const sidebar = (
-    <aside className="w-64 shrink-0">
+    <aside className="shrink-0 md:w-64">
       {course?.slug && (
         <Link href={`/programs/${course.slug}`} className="text-sm font-medium text-tan hover:text-ink">
           ← {course.title}
@@ -150,7 +150,7 @@ export default async function LessonPage({ params }: { params: Promise<{ slug: s
     return (
       <>
         <SiteHeader />
-        <main className="flex w-full gap-10 pl-8 pr-6 py-10">
+        <main className="flex w-full flex-col gap-6 px-4 py-8 sm:px-6 md:flex-row md:gap-10 md:px-8 md:py-10">
           {sidebar}
           <div className="min-w-0 flex-1">
             <div className="rounded-2xl border border-border bg-card px-8 py-14 text-center">
@@ -176,7 +176,7 @@ export default async function LessonPage({ params }: { params: Promise<{ slug: s
       <>
         <SiteHeader />
         <LessonViewTracker courseId={node.course_id} nodeId={node.id} />
-        <main className="flex w-full gap-10 pl-8 pr-6 py-10">
+        <main className="flex w-full flex-col gap-6 px-4 py-8 sm:px-6 md:flex-row md:gap-10 md:px-8 md:py-10">
           {sidebar}
           <div className="min-w-0 flex-1">
             <QuizLesson title={node.title} questions={questions ?? []} nodeId={node.id} alreadyDone={isComplete} />
@@ -223,7 +223,7 @@ export default async function LessonPage({ params }: { params: Promise<{ slug: s
       <SiteHeader />
       <LessonViewTracker courseId={node.course_id} nodeId={node.id} />
       {assignment ? (
-        <main className="flex w-full gap-10 pl-8 pr-6 py-10">
+        <main className="flex w-full flex-col gap-6 px-4 py-8 sm:px-6 md:flex-row md:gap-10 md:px-8 md:py-10">
           {sidebar}
           <div className="grid min-w-0 flex-1 grid-cols-1 gap-8 xl:grid-cols-2">
             <div>
@@ -236,7 +236,7 @@ export default async function LessonPage({ params }: { params: Promise<{ slug: s
           </div>
         </main>
       ) : (
-        <main className="flex w-full gap-10 pl-8 pr-6 py-10">
+        <main className="flex w-full flex-col gap-6 px-4 py-8 sm:px-6 md:flex-row md:gap-10 md:px-8 md:py-10">
           {sidebar}
           <div className="min-w-0 flex-1">
             {article}

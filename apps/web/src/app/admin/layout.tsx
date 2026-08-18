@@ -57,25 +57,25 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border">
-        <div className="flex items-center justify-between pl-8 pr-6 py-4">
+        <div className="flex items-center justify-between px-4 py-4 sm:pl-8 sm:pr-6">
           <Link href="/">
             <Logo />
           </Link>
           <span className="text-xs font-semibold uppercase tracking-wide text-ink/40">Admin</span>
         </div>
-        <nav className="flex gap-1 pl-8 pr-6 pb-3 text-sm font-medium">
+        <nav className="flex gap-1 overflow-x-auto px-4 pb-3 text-sm font-medium sm:pl-8 sm:pr-6">
           {TABS.map((tab) => (
             <Link
               key={tab.href}
               href={tab.href}
-              className="rounded px-3 py-1.5 text-ink/70 hover:bg-card hover:text-ink"
+              className="shrink-0 rounded px-3 py-1.5 text-ink/70 hover:bg-card hover:text-ink"
             >
               {tab.label}
             </Link>
           ))}
         </nav>
       </header>
-      <main className="pl-8 pr-6 py-10">{children}</main>
+      <main className="px-4 py-8 sm:pl-8 sm:pr-6 sm:py-10">{children}</main>
     </div>
   );
 }

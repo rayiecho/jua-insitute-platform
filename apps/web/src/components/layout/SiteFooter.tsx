@@ -4,7 +4,7 @@ import { LogoMark } from '@/components/brand/Logo';
 export function SiteFooter() {
   return (
     <footer className="border-t border-border">
-      <div className="flex flex-col gap-6 pl-8 pr-6 py-8 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-6 px-4 py-8 sm:flex-row sm:items-center sm:justify-between sm:pl-8 sm:pr-6">
         <div className="flex items-center gap-2">
           <LogoMark className="h-6 w-6" />
           <span className="font-serif text-sm font-semibold text-ink">Jua Institute</span>
