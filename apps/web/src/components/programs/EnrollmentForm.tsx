@@ -1,10 +1,10 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import Link from 'next/link';
 import { createBrowserSupabaseClient } from '@/lib/supabase/client';
-
-const NEXT_COOKIE = 'auth_next';
+import { OtpVerifyForm } from '@/components/auth/OtpVerifyForm';
 
 const EDUCATION_LEVELS = ['High school', 'Undergraduate', 'Graduate', 'Working professional', 'Other'];
 const COMMITMENT_OPTIONS = ['2–4 hrs/week', '5–7 hrs/week', '8–10 hrs/week', '10+ hrs/week'];
@@ -20,11 +20,13 @@ const INTEREST_OPTIONS = [
 // The real "I'm enrolling" form (Section 4.4 — this is what makes the tutor
 // coach on THIS course rather than guessing). Two steps under the hood:
 // stage the application (POST /api/enroll-application, visible to admin
-// immediately) then send the one-time verification link — the actual
-// enrollment row isn't created until that link is clicked (see
-// lib/auth/provision.ts), so a submitted-but-unverified application doesn't
-// yet count as "enrolled."
+// immediately) then send a one-time code the learner types right here —
+// see components/auth/OtpVerifyForm.tsx for why a typed code replaced the
+// email-link click entirely. The actual enrollment row isn't created until
+// that code is verified (see lib/auth/provision.ts), so a
+// submitted-but-unverified application doesn't yet count as "enrolled."
 export function EnrollmentForm({ courseId, className }: { courseId: string; className?: string }) {
+  const router = useRouter();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -33,7 +35,7 @@ export function EnrollmentForm({ courseId, className }: { courseId: string; clas
   const [interests, setInterests] = useState<string[]>([]);
   const [policyAccepted, setPolicyAccepted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [sent, setSent] = useState(false);
+  const [awaitingCode, setAwaitingCode] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   function toggleInterest(option: string) {
@@ -62,15 +64,14 @@ export function EnrollmentForm({ courseId, className }: { courseId: string; clas
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Failed to submit application');
 
-      document.cookie = `${NEXT_COOKIE}=/dashboard; path=/; max-age=600; SameSite=Lax`;
       const supabase = createBrowserSupabaseClient();
       const { error: otpError } = await supabase.auth.signInWithOtp({
         email,
-        options: { emailRedirectTo: window.location.origin, data: { first_name: firstName, last_name: lastName } },
+        options: { data: { first_name: firstName, last_name: lastName } },
       });
       if (otpError) throw otpError;
 
-      setSent(true);
+      setAwaitingCode(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
     } finally {
@@ -78,14 +79,10 @@ export function EnrollmentForm({ courseId, className }: { courseId: string; clas
     }
   }
 
-  if (sent) {
+  if (awaitingCode) {
     return (
-      <div className={`rounded-lg border border-gold bg-gold/10 px-4 py-3 ${className ?? ''}`}>
-        <p className="text-sm font-medium text-ink">Check your email</p>
-        <p className="mt-1 text-sm text-ink/60">
-          We sent a verification link to <span className="font-medium">{email}</span>. Click it once to confirm —
-          after that you won&apos;t need to verify again, for lessons or live classes.
-        </p>
+      <div className={className}>
+        <OtpVerifyForm email={email} onVerified={(redirectTo) => router.push(redirectTo)} />
       </div>
     );
   }
