@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Fraunces } from "next/font/google";
 import "./globals.css";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { AuthHashHandler } from "@/components/auth/AuthHashHandler";
+import { AuthErrorBanner } from "@/components/auth/AuthErrorBanner";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -32,6 +33,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        <AuthErrorBanner />
         <AuthHashHandler />
         {children}
         <SiteFooter />

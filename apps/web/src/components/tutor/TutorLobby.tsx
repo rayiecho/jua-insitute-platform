@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { LogoMark } from '@/components/brand/Logo';
 import { ClassroomShell } from './ClassroomShell';
 import { TutorSessionRoom } from './TutorSessionRoom';
+import { createBrowserSupabaseClient } from '@/lib/supabase/client';
 import type { Learner } from '@/lib/learner';
 
 type Status = 'idle' | 'checking' | 'not_found' | 'not_verified' | 'not_enrolled' | 'ready' | 'in-session';
@@ -103,6 +104,7 @@ export function TutorLobby() {
             title="Almost there — verify your email"
             body="We found your application, but you haven't clicked the verification link yet. Check your email for it — after that you're all set for classes."
             onBack={() => setStatus('idle')}
+            resendEmail={email}
           />
         )}
 
@@ -140,13 +142,32 @@ function NoticeCard({
   ctaHref,
   ctaLabel,
   onBack,
+  resendEmail,
 }: {
   title: string;
   body: string;
   ctaHref?: string;
   ctaLabel?: string;
   onBack: () => void;
+  resendEmail?: string;
 }) {
+  const [resendState, setResendState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+
+  async function resend() {
+    if (!resendEmail) return;
+    setResendState('sending');
+    try {
+      const supabase = createBrowserSupabaseClient();
+      const { error } = await supabase.auth.signInWithOtp({
+        email: resendEmail,
+        options: { emailRedirectTo: window.location.origin },
+      });
+      setResendState(error ? 'error' : 'sent');
+    } catch {
+      setResendState('error');
+    }
+  }
+
   return (
     <div className="mt-8 flex w-full flex-col items-center gap-4 rounded-2xl border border-border bg-card px-8 py-10 text-center shadow-sm">
       <p className="font-serif text-xl font-semibold text-ink">{title}</p>
@@ -155,6 +176,22 @@ function NoticeCard({
         <Link href={ctaHref} className="mt-2 rounded bg-gold px-6 py-3 font-semibold text-ink">
           {ctaLabel}
         </Link>
+      )}
+      {resendEmail && (
+        <button
+          type="button"
+          onClick={resend}
+          disabled={resendState === 'sending' || resendState === 'sent'}
+          className="text-xs font-medium text-tan hover:text-ink disabled:opacity-50"
+        >
+          {resendState === 'sent'
+            ? 'Link resent — check your email'
+            : resendState === 'sending'
+              ? 'Resending…'
+              : resendState === 'error'
+                ? 'Failed to resend — try again'
+                : 'Resend verification link'}
+        </button>
       )}
       <button type="button" onClick={onBack} className="text-xs font-medium text-ink/50 hover:text-ink">
         Try a different email
