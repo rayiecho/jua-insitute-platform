@@ -61,13 +61,17 @@ export function OtpVerifyForm({
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-3">
       <p className="text-sm text-ink/60">
-        Enter the 6-digit code we sent to <span className="font-medium">{email}</span>.
+        Enter the verification code we sent to <span className="font-medium">{email}</span>.
       </p>
       <input
         className="rounded border border-border bg-card px-3 py-2 text-center text-lg tracking-[0.3em] text-ink"
-        placeholder="000000"
+        placeholder="Verification code"
         inputMode="numeric"
-        maxLength={6}
+        // Supabase's OTP length is configurable per-project and this
+        // project's is 8 digits, not the more common 6 — confirmed live
+        // (2026-08-18) after a hardcoded maxLength={6} silently truncated a
+        // real code and made a valid submission fail. No cap here; trust the
+        // server to reject anything actually wrong.
         value={code}
         onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
         required
