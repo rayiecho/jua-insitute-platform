@@ -45,6 +45,15 @@ export function TutorSessionUI({ learner }: { learner: Learner }) {
   const [reactions, setReactions] = useState<{ id: number; emoji: string }[]>([]);
   const screenShareTracks = useTracks([Track.Source.ScreenShare]);
   const screenShareTrack = screenShareTracks[0];
+  // The Simli avatar (apps/agent/src/simli-avatar.ts) publishes real video
+  // into the room as its own participant ("simli-avatar-agent") once
+  // SIMLI_FACE_ID is set — this was previously never rendered anywhere, so
+  // the classroom stayed on the static placeholder tile even with a real
+  // avatar live in the room. Any remote camera-source track is the avatar's
+  // (the learner's own camera is never published — see the disabled Camera
+  // button below), so no identity matching needed.
+  const cameraTracks = useTracks([Track.Source.Camera]);
+  const avatarVideoTrack = cameraTracks.find((t) => !t.participant.isLocal);
 
   const { send: sendHandRaise } = useDataChannel('hand-raise');
   const { send: sendReaction } = useDataChannel('reaction', (msg) => {
@@ -97,6 +106,10 @@ export function TutorSessionUI({ learner }: { learner: Learner }) {
           {screenShareTrack ? (
             <div className="aspect-video w-full max-w-4xl overflow-hidden rounded-2xl border border-border bg-ink shadow-sm">
               <VideoTrack trackRef={screenShareTrack} className="h-full w-full" />
+            </div>
+          ) : avatarVideoTrack ? (
+            <div className="aspect-video w-full max-w-2xl overflow-hidden rounded-2xl border border-border bg-ink shadow-sm">
+              <VideoTrack trackRef={avatarVideoTrack} className="h-full w-full object-cover" />
             </div>
           ) : (
             <TutorTile state={state} audioTrack={audioTrack} label={stateLabel} />

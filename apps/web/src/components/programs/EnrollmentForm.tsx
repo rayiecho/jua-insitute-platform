@@ -192,8 +192,12 @@ export function EnrollmentForm({ courseId, className }: { courseId: string; clas
         />
         <span>
           I agree to the{' '}
-          <Link href="/policies" target="_blank" className="font-medium text-tan hover:text-ink">
-            policies and terms of use
+          <Link href="/terms" target="_blank" className="font-medium text-tan hover:text-ink">
+            Terms of Use
+          </Link>{' '}
+          and{' '}
+          <Link href="/privacy" target="_blank" className="font-medium text-tan hover:text-ink">
+            Privacy Policy
           </Link>
           .
         </span>

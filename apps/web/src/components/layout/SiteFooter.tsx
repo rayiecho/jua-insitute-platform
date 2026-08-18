@@ -22,6 +22,12 @@ export function SiteFooter() {
           <Link href="/tutor" className="hover:text-ink">
             Talk to your tutor
           </Link>
+          <Link href="/terms" className="hover:text-ink">
+            Terms
+          </Link>
+          <Link href="/privacy" className="hover:text-ink">
+            Privacy
+          </Link>
         </nav>
         <p className="text-xs text-ink/40">© {new Date().getFullYear()} Jua Institute</p>
       </div>
