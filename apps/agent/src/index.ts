@@ -7,6 +7,7 @@ import {
   cli,
   defineAgent,
   voice,
+  llm,
   AgentSessionEventTypes,
 } from '@livekit/agents';
 import * as openai from '@livekit/agents-plugin-openai';
@@ -19,6 +20,18 @@ import { CompactionManager } from './compaction.js';
 import { logConnectionEvent } from './supabase.js';
 import { logSessionUsage } from './cost-tracking.js';
 import { HandRaiseListener, publishPreparedVideo } from './room-interactions.js';
+import { SimliAvatarSession } from './simli-avatar.js';
+
+// Live classes are capped at 45 minutes — deliberately shorter than
+// course_weeks.live_session_duration_minutes' original 90, because Simli
+// (the avatar vendor) is only affordable at a max of 2 concurrent sessions
+// on the current plan, so shorter sessions let more learners actually get a
+// slot per day. Enforced twice: as Simli's own maxSessionLength (kills the
+// avatar) and as a hard room-level timer below (ends the whole class, not
+// just the video) in case those ever drift apart.
+const CLASS_DURATION_MINUTES = 45;
+const CLASS_DURATION_MS = CLASS_DURATION_MINUTES * 60 * 1000;
+const WIND_DOWN_WARNING_MS = CLASS_DURATION_MS - 3 * 60 * 1000; // 3 min before the end
 
 // Section 4.1 / 4.2 / 4.3 of platform-technical-specification-mvp.md drive the
 // shape of this worker. Each numbered section below maps to one behavior
@@ -35,7 +48,23 @@ export default defineAgent({
 
     // Hoisted so the same LLM instance can also drive context compaction
     // (Section 4.3) below, instead of spinning up a second one.
-    const llm = openai.LLM.withGroq({ model: 'openai/gpt-oss-20b' });
+    const groqLlm = openai.LLM.withGroq({ model: 'openai/gpt-oss-20b' });
+
+    // The tutor's own way to end a class early — the spec calls for this
+    // explicitly ("if it sees the learner is not focused, they just end the
+    // class"). True visual disengagement detection needs the vision work
+    // that hasn't landed yet; until then this gives the tutor a real,
+    // usable exit when the learner is clearly checked out (repeated
+    // non-answers, explicitly asking to stop, going quiet for a long
+    // stretch), rather than being stuck narrating to no one.
+    const endClassTool = llm.tool({
+      description:
+        "End the live class now. Use this only if the learner is clearly disengaged (repeatedly not responding, explicitly asking to end, or has been silent for a long stretch despite you checking in) — not just because the material is hard or they're thinking.",
+      execute: async () => {
+        setTimeout(() => void ctx.room.disconnect(), 1500); // let the closing line finish playing
+        return 'Ending the class now.';
+      },
+    });
 
     const session = new voice.AgentSession({
       // Direct Deepgram STT. Previously routed through LiveKit's inference gateway
@@ -59,7 +88,7 @@ export default defineAgent({
       // off empty (confirmed: 10 tokens produced pure reasoning and no reply; 100 was
       // enough). Groq's available model lineup changes often — recheck against
       // https://api.groq.com/openai/v1/models if this 404s again later.
-      llm,
+      llm: groqLlm,
       // TEMPORARY (cost): Cartesia's free tier (20K credits/month) was exhausted almost
       // immediately by real testing, and even the $5/mo Pro tier's 100K credits would
       // likely go the same way. Deepgram — already in use for STT — also does TTS
@@ -76,9 +105,10 @@ export default defineAgent({
     });
 
     const stateInjector = new StateInjector(session, learnerId); // Section 4.1 — shared focus
-    const compaction = new CompactionManager(session, ctx.room.name ?? 'unknown-room', llm); // Section 4.3
+    const compaction = new CompactionManager(session, ctx.room.name ?? 'unknown-room', groqLlm); // Section 4.3
     const handRaise = new HandRaiseListener(ctx.room, session); // live-class raise-hand
     const sessionStartedAt = Date.now(); // Section 5/6 — cost monitoring
+    let classTimers: ReturnType<typeof setTimeout>[] = [];
 
     // Section 4.2 — interruption must be a server-side event, not client-triggered, so it
     // survives mobile network jitter. AgentSession's own VAD-mode interruption (configured
@@ -92,16 +122,48 @@ export default defineAgent({
       stateInjector.dispose();
       compaction.dispose();
       handRaise.dispose();
+      classTimers.forEach(clearTimeout);
       void logSessionUsage(session, ctx.room.name ?? 'unknown-room', sessionStartedAt);
     });
 
+    // Real avatar (Simli) — see simli-avatar.ts for why this is a hand-port
+    // of Simli's Python plugin rather than an official Node package (none
+    // exists). SIMLI_FACE_ID picks which face renders; capped at
+    // CLASS_DURATION_MINUTES so Simli's own session timer matches the
+    // room-level one below rather than cutting the avatar off mid-class at
+    // its 10-minute default.
+    const simliFaceId = process.env.SIMLI_FACE_ID;
+    if (simliFaceId) {
+      const avatar = new SimliAvatarSession({
+        faceId: simliFaceId,
+        maxSessionLengthSeconds: CLASS_DURATION_MINUTES * 60,
+      });
+      await avatar.start(session, ctx.room);
+    }
+
     await session.start({
-      agent: voice.Agent.create({ instructions: opening.systemPrompt }),
+      agent: voice.Agent.create({ instructions: opening.systemPrompt, tools: { endClass: endClassTool } }),
       room: ctx.room,
     });
 
     await ctx.connect();
     await logConnectionEvent(ctx.room.name ?? 'unknown-room', 'connected'); // Section 4.5
+
+    // Hard cap independent of Simli's own timer (see CLASS_DURATION_MS
+    // comment above) — ends the whole class, not just the avatar's video,
+    // so a drift between the two never leaves a voice-only tutor talking
+    // into a frozen frame.
+    classTimers = [
+      setTimeout(() => {
+        void session.generateReply({
+          instructions:
+            "Let the learner know, briefly, that this session is wrapping up in about 3 minutes — don't cut off what you're doing abruptly, just work toward a natural stopping point.",
+        });
+      }, WIND_DOWN_WARNING_MS),
+      setTimeout(() => {
+        void ctx.room.disconnect();
+      }, CLASS_DURATION_MS),
+    ];
 
     if (opening.preparedVideo) publishPreparedVideo(ctx.room, opening.preparedVideo);
 

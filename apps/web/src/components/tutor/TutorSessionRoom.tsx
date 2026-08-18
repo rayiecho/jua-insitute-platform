@@ -42,6 +42,9 @@ function Connector({ learner, onLeave }: { learner: Learner; onLeave?: () => voi
       .then(async (res) => {
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
+          if (body.error === 'class_capacity_full') {
+            throw new Error("All live classes are full right now — only a couple can run at once. Try again shortly.");
+          }
           throw new Error(body.error ?? `Failed to fetch session token (${res.status})`);
         }
         return res.json() as Promise<ConnectionDetails>;

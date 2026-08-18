@@ -45,13 +45,29 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'LiveKit server env vars are not configured' }, { status: 500 });
   }
 
+  const roomServiceClient = new RoomServiceClient(serverUrl, apiKey, apiSecret);
+
+  // The avatar vendor (Simli) is only affordable at up to 2 concurrent
+  // sessions on the current plan — every live class room gets a real,
+  // billed avatar session, so this has to be a hard cap checked live
+  // against LiveKit, not a soft admin-side estimate. Rejoining a room this
+  // same learner is already in (a refresh, say) never counts against the
+  // cap — only genuinely other concurrent classes do.
+  const MAX_CONCURRENT_CLASSES = 2;
+  const existingRooms = await roomServiceClient.listRooms();
+  const otherActiveClasses = existingRooms.filter(
+    (r) => r.name.startsWith('learner-') && r.name !== room && r.numParticipants > 0,
+  );
+  if (otherActiveClasses.length >= MAX_CONCURRENT_CLASSES) {
+    return NextResponse.json({ error: 'class_capacity_full' }, { status: 429 });
+  }
+
   const token = new AccessToken(apiKey, apiSecret, { identity, ttl: '15m' });
   token.addGrant({ room, roomJoin: true, canPublish: true, canSubscribe: true });
 
   // listDispatch 404s if the room doesn't exist yet (rooms are otherwise only
   // created implicitly when the first participant joins) — createRoom is a
   // no-op against an already-existing room, so this is safe to call every time.
-  const roomServiceClient = new RoomServiceClient(serverUrl, apiKey, apiSecret);
   await roomServiceClient.createRoom({ name: room });
 
   const dispatchClient = new AgentDispatchClient(serverUrl, apiKey, apiSecret);
