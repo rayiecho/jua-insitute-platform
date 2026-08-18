@@ -98,7 +98,10 @@ export default defineAgent({
       // one. Swap back to `new cartesia.TTS({ model: 'sonic-3', voice: process.env.CARTESIA_VOICE_ID })`
       // (@livekit/agents-plugin-cartesia, still installed) if Cartesia's pricing becomes
       // worth it later — e.g. for voice cloning, which Deepgram's Aura voices don't do.
-      tts: new deepgram.TTS({ model: 'aura-2-asteria-en' }),
+      // Male voice (Deepgram's real, current Aura-2 catalog, verified 2026-08-18)
+      // to match the male avatar face — "asteria" was a female voice, a
+      // mismatch confirmed live once the avatar's face became visible.
+      tts: new deepgram.TTS({ model: 'aura-2-orpheus-en' }),
       vad: await silero.VAD.load(),
       turnHandling: {
         interruption: { mode: 'vad', enabled: true }, // Section 4.2 — VAD interruption throttle

@@ -1,6 +1,6 @@
 import { getJobContext, voice } from '@livekit/agents';
 import type { AgentSession } from '@livekit/agents';
-import type { Room } from '@livekit/rtc-node';
+import { TrackKind, type Room } from '@livekit/rtc-node';
 import { AccessToken } from 'livekit-server-sdk';
 
 // No official @livekit/agents-plugin-simli exists for Node — Simli only
@@ -128,10 +128,20 @@ export class SimliAvatarSession extends voice.AvatarSession {
     }
     console.log('[simli] integrations/livekit/agents response:', joinBody);
 
+    // The Python plugin (and this port's first version) omitted
+    // waitRemoteTrack — confirmed live 2026-08-18 that without it, a real
+    // class's opening line sat as a "Creating speech handle" that never
+    // completed for 40+ seconds until forcibly cancelled: audio was being
+    // pushed into the DataStream, but with nothing telling this output to
+    // gate playback-completion on the avatar's video track actually
+    // arriving, it likely raced ahead of Simli's own synced avatar
+    // pipeline. Bey's own (real, shipping) plugin sets this explicitly —
+    // matching that here.
     agentSession.output.audio = new voice.DataStreamAudioOutput({
       room,
       destinationIdentity: AVATAR_AGENT_IDENTITY,
       sampleRate: SAMPLE_RATE,
+      waitRemoteTrack: TrackKind.KIND_VIDEO,
     });
   }
 }
