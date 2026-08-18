@@ -7,6 +7,7 @@ import { YouTubeEmbed } from '@/components/programs/YouTubeEmbed';
 
 interface Guide {
   courseTitle: string | null;
+  week: { weekNumber: number; title: string; summary: string; lessonTitles: string[] } | null;
   nodeTitle: string | null;
   nodeContent: string | null;
   videoUrl: string | null;
@@ -73,7 +74,27 @@ export function SessionGuidePanel({
             {guide.courseTitle && (
               <p className="text-xs font-semibold uppercase tracking-wide text-tan">{guide.courseTitle}</p>
             )}
-            <h2 className="mt-1 font-serif text-xl font-semibold text-ink">{guide.nodeTitle}</h2>
+
+            {guide.week && (
+              <div className="mt-1 rounded-xl border border-border bg-background p-3">
+                <p className="font-serif text-base font-semibold text-ink">
+                  Week {guide.week.weekNumber}: {guide.week.title}
+                </p>
+                <p className="mt-1 text-sm leading-relaxed text-ink/70">{guide.week.summary}</p>
+                {guide.week.lessonTitles.length > 0 && (
+                  <ul className="mt-3 space-y-1 text-xs text-ink/60">
+                    {guide.week.lessonTitles.map((title) => (
+                      <li key={title} className={title === guide.nodeTitle ? 'font-semibold text-ink' : ''}>
+                        {title === guide.nodeTitle ? '→ ' : '• '}
+                        {title}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+
+            <h2 className="mt-4 font-serif text-xl font-semibold text-ink">{guide.nodeTitle}</h2>
 
             {guide.videoUrl && (
               <div
