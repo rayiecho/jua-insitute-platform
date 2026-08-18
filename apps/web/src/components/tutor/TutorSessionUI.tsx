@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Track } from 'livekit-client';
+import type { TrackReference } from '@livekit/components-core';
 import {
   BarVisualizer,
   DisconnectButton,
@@ -28,18 +29,17 @@ const AGENT_STATE_LABEL: Record<string, string> = {
 
 const REACTIONS = ['👍', '🎉', '❓', '👏'];
 
-// The live classroom (Section 1: "The Live Class Layer"). Laid out like a
-// real meeting room — a tutor "stage" tile and a learner tile — with the
-// interaction layer a real class needs: raise hand (reaches the tutor's
-// actual live context, not just a UI toggle — see
-// apps/agent/src/room-interactions.ts), reactions, screen share, and a
-// session guide panel standing in for "prepared slides", built from the
-// same lesson content the tutor already teaches from rather than a new
-// slide-authoring system. Camera is visibly reserved (present, disabled)
-// for the eventual avatar rather than hidden.
+// The live classroom, laid out as a real two-way video call — the tutor's
+// avatar as the main stage, the learner's own camera as a self-view tile in
+// the corner (Google Meet-style), both genuinely visible to each other. The
+// learner's camera now auto-publishes on join (see video prop on
+// LiveKitRoom in TutorSessionRoom.tsx) rather than being a disabled
+// placeholder button — raise hand, reactions, screen share, and a session
+// guide panel (standing in for prepared slides, built from the same lesson
+// content the tutor teaches from) round out the interaction layer.
 export function TutorSessionUI({ learner }: { learner: Learner }) {
   const { state, audioTrack } = useVoiceAssistant();
-  const { isMicrophoneEnabled, isScreenShareEnabled, localParticipant } = useLocalParticipant();
+  const { isMicrophoneEnabled, isCameraEnabled, isScreenShareEnabled, localParticipant } = useLocalParticipant();
   const [guideOpen, setGuideOpen] = useState(false);
   const [handRaised, setHandRaised] = useState(false);
   const [reactions, setReactions] = useState<{ id: number; emoji: string }[]>([]);
@@ -47,13 +47,15 @@ export function TutorSessionUI({ learner }: { learner: Learner }) {
   const screenShareTrack = screenShareTracks[0];
   // The Simli avatar (apps/agent/src/simli-avatar.ts) publishes real video
   // into the room as its own participant ("simli-avatar-agent") once
-  // SIMLI_FACE_ID is set — this was previously never rendered anywhere, so
-  // the classroom stayed on the static placeholder tile even with a real
-  // avatar live in the room. Any remote camera-source track is the avatar's
-  // (the learner's own camera is never published — see the disabled Camera
-  // button below), so no identity matching needed.
-  const cameraTracks = useTracks([Track.Source.Camera]);
-  const avatarVideoTrack = cameraTracks.find((t) => !t.participant.isLocal);
+  // SIMLI_FACE_ID is set. useTracks() only returns tracks matching the
+  // requested source list — Simli's actual publish source was never
+  // confirmed (their docs don't say), so this is widened to every known
+  // video source rather than assuming Camera specifically.
+  const videoTracks = useTracks([Track.Source.Camera, Track.Source.ScreenShare, Track.Source.Unknown]);
+  const avatarVideoTrack = videoTracks.find(
+    (t) => !t.participant.isLocal && t.source !== Track.Source.ScreenShare,
+  );
+  const localCameraTrack = videoTracks.find((t) => t.participant.isLocal && t.source === Track.Source.Camera);
 
   const { send: sendHandRaise } = useDataChannel('hand-raise');
   const { send: sendReaction } = useDataChannel('reaction', (msg) => {
@@ -115,7 +117,7 @@ export function TutorSessionUI({ learner }: { learner: Learner }) {
             <TutorTile state={state} audioTrack={audioTrack} label={stateLabel} />
           )}
 
-          <LearnerTile learner={learner} micOn={isMicrophoneEnabled} handRaised={handRaised} />
+          <LearnerTile learner={learner} cameraTrack={localCameraTrack} micOn={isMicrophoneEnabled} handRaised={handRaised} />
 
           {/* Floating reactions rise from the center of the stage. */}
           <div className="pointer-events-none absolute inset-x-0 bottom-1/3 flex justify-center">
@@ -145,6 +147,16 @@ export function TutorSessionUI({ learner }: { learner: Learner }) {
             }`}
           >
             {isMicrophoneEnabled ? 'Mute' : 'Unmute'}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => localParticipant.setCameraEnabled(!isCameraEnabled)}
+            className={`rounded-full border px-4 py-2.5 text-sm font-medium transition-colors ${
+              isCameraEnabled ? 'border-border text-ink hover:bg-card' : 'border-red-300 bg-red-50 text-red-600'
+            }`}
+          >
+            {isCameraEnabled ? 'Stop video' : 'Start video'}
           </button>
 
           <button
@@ -189,15 +201,6 @@ export function TutorSessionUI({ learner }: { learner: Learner }) {
             }`}
           >
             Guide
-          </button>
-
-          <button
-            type="button"
-            disabled
-            title="Video is coming soon"
-            className="cursor-not-allowed rounded-full border border-border px-4 py-2.5 text-sm font-medium text-ink/30"
-          >
-            Camera
           </button>
 
           <DisconnectButton className="rounded-full bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700">
@@ -246,22 +249,33 @@ function TutorTile({
 
 function LearnerTile({
   learner,
+  cameraTrack,
   micOn,
   handRaised,
 }: {
   learner: Learner;
+  cameraTrack: TrackReference | undefined;
   micOn: boolean;
   handRaised: boolean;
 }) {
   const initial = learner.firstName.charAt(0).toUpperCase();
+
   return (
-    <div className="absolute bottom-8 right-8 flex items-center gap-2.5 rounded-xl border border-border bg-card px-4 py-2.5 shadow-sm">
-      {handRaised && <span title="Hand raised">✋</span>}
-      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gold text-xs font-semibold text-ink">
-        {initial}
-      </span>
-      <span className="text-sm font-medium text-ink">{learner.firstName}</span>
-      <span className={`h-2 w-2 rounded-full ${micOn ? 'bg-gold' : 'bg-border'}`} title={micOn ? 'Mic on' : 'Muted'} />
+    <div className="absolute bottom-8 right-8 flex h-32 w-44 flex-col overflow-hidden rounded-xl border border-border bg-ink shadow-sm">
+      {cameraTrack ? (
+        <VideoTrack trackRef={cameraTrack} className="h-full w-full object-cover" />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center bg-card">
+          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-gold text-sm font-semibold text-ink">
+            {initial}
+          </span>
+        </div>
+      )}
+      <div className="absolute bottom-1.5 left-1.5 flex items-center gap-1.5 rounded-md bg-black/50 px-2 py-1">
+        {handRaised && <span title="Hand raised">✋</span>}
+        <span className="text-xs font-medium text-white">{learner.firstName}</span>
+        <span className={`h-1.5 w-1.5 rounded-full ${micOn ? 'bg-gold' : 'bg-white/40'}`} title={micOn ? 'Mic on' : 'Muted'} />
+      </div>
     </div>
   );
 }

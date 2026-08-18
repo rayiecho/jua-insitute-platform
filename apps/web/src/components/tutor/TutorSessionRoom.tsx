@@ -90,7 +90,7 @@ function Connector({ learner, onLeave }: { learner: Learner; onLeave?: () => voi
       token={details.token}
       connect
       audio
-      video={false}
+      video
       onDisconnected={() => {
         setDetails(null);
         onLeave?.();
