@@ -1,55 +1,41 @@
 import { AccessToken, AgentDispatchClient, RoomServiceClient } from 'livekit-server-sdk';
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
 
 const AGENT_NAME = 'ai-tutor'; // must match ServerOptions.agentName in apps/agent/src/index.ts
 
-// Mints a room-join token for the live tutoring session. This is a server
-// Route Handler so LIVEKIT_API_SECRET never reaches the client.
-//
-// The agent worker registers under a named agent (`ai-tutor`), which means
-// LiveKit will NOT auto-dispatch it into a room just because a participant
-// joined — an explicit dispatch is required. We create one here (idempotent:
-// skipped if a dispatch already exists for this room) so joining the room
-// from the web client actually gets you a tutor.
-//
-// Also ensures a classroom_sessions + session_curriculum_context row exist
-// for this room/learner (Section 4.4 continuity) so the agent's opening
-// context query has real data instead of coming up empty.
-//
-// Identity comes from the real auth session now, not a client-supplied query
-// param — previously any caller could pass any learnerId and mint a token
-// impersonating them. `room` is still client-supplied but must match this
-// learner's own room, so a signed-in learner can't request a token for
-// someone else's room either.
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const room = searchParams.get('room');
-
-  if (!room) {
-    return NextResponse.json({ error: 'room query param is required' }, { status: 400 });
+// Mints a room-join token for the live tutoring session. Deliberately
+// session-independent — live classes don't use the browser's auth cookie at
+// all, by design (see TutorLobby): the learner types their first name and
+// email every time, and identity is resolved from that against
+// platform_users, not from a signed-in session. "Cannot have a live class
+// if not enrolled" is still enforced — verification and enrollment happen
+// once, at application time (lib/auth/provision.ts) — this just doesn't
+// require the *browser* to still be carrying that session later.
+export async function POST(request: Request) {
+  const { firstName, email } = (await request.json()) as { firstName?: string; email?: string };
+  if (!firstName?.trim() || !email?.trim()) {
+    return NextResponse.json({ error: 'firstName and email are required' }, { status: 400 });
   }
-
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.json({ error: 'not signed in' }, { status: 401 });
-  }
-  if (room !== `learner-${user.id}`) {
-    return NextResponse.json({ error: 'cannot request a token for another learner\'s room' }, { status: 403 });
-  }
-
-  const identity = user.id;
 
   const admin = createAdminClient();
-  const { data: anyEnrollment } = await admin.from('enrollments').select('id').eq('user_id', identity).limit(1);
-  if (!anyEnrollment || anyEnrollment.length === 0) {
-    return NextResponse.json({ error: 'not enrolled in a program yet' }, { status: 403 });
+  const { data: learner } = await admin
+    .from('platform_users')
+    .select('id, first_name, last_name, email, email_verified')
+    .eq('email', email.trim().toLowerCase())
+    .maybeSingle();
+
+  if (!learner || !learner.email_verified) {
+    return NextResponse.json({ error: 'not_verified' }, { status: 403 });
   }
+
+  const { data: anyEnrollment } = await admin.from('enrollments').select('id').eq('user_id', learner.id).limit(1);
+  if (!anyEnrollment || anyEnrollment.length === 0) {
+    return NextResponse.json({ error: 'not_enrolled' }, { status: 403 });
+  }
+
+  const identity = learner.id;
+  const room = `learner-${identity}`;
 
   const apiKey = process.env.LIVEKIT_API_KEY;
   const apiSecret = process.env.LIVEKIT_API_SECRET;
@@ -76,7 +62,15 @@ export async function GET(request: Request) {
 
   await ensureSessionCurriculumContext(room, identity);
 
-  return NextResponse.json({ token: await token.toJwt(), serverUrl, room, identity });
+  return NextResponse.json({
+    token: await token.toJwt(),
+    serverUrl,
+    room,
+    identity,
+    firstName: learner.first_name,
+    lastName: learner.last_name,
+    email: learner.email,
+  });
 }
 
 async function ensureSessionCurriculumContext(room: string, userId: string) {

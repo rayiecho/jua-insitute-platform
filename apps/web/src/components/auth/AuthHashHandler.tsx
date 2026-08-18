@@ -49,7 +49,7 @@ export function AuthHashHandler() {
 
     const supabase = createBrowserSupabaseClient();
 
-    supabase.auth.setSession({ access_token, refresh_token }).then(({ error }) => {
+    supabase.auth.setSession({ access_token, refresh_token }).then(async ({ error }) => {
       // Strip the token fragment either way so it doesn't linger in the
       // address bar or get shared/bookmarked.
       window.history.replaceState(null, '', window.location.pathname + window.location.search);
@@ -60,7 +60,24 @@ export function AuthHashHandler() {
         return;
       }
 
-      const next = readCookie(NEXT_COOKIE) || '/';
+      // Marks the learner verified and, if they were mid-enrollment, creates
+      // the real enrollment row — see /api/auth/complete-verification.
+      // Its redirectTo (first lesson, or dashboard) wins over the plain
+      // `next` cookie when both are present, since it reflects what actually
+      // just happened server-side.
+      let redirectTo: string | null = null;
+      try {
+        const res = await fetch('/api/auth/complete-verification', { method: 'POST' });
+        if (res.ok) {
+          const data = await res.json();
+          redirectTo = data.redirectTo ?? null;
+        }
+      } catch {
+        // Network hiccup — fall through to the cookie-based next below
+        // rather than stranding the learner on a blank page.
+      }
+
+      const next = redirectTo || readCookie(NEXT_COOKIE) || '/';
       deleteCookie(NEXT_COOKIE);
       router.replace(next);
     });

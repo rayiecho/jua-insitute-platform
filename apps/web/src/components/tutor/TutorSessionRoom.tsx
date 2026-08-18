@@ -20,29 +20,25 @@ interface ConnectionDetails {
 // connecting. `onLeave` lets a caller (TutorLobby) return to its own "ready
 // to join again?" screen instead of this component silently trying to
 // reconnect on its own.
-export function TutorSessionRoom({
-  room,
-  learner,
-  onLeave,
-}: {
-  room: string;
-  learner?: Learner;
-  onLeave?: () => void;
-}) {
-  if (learner) return <Connector room={room} learner={learner} onLeave={onLeave} />;
-  return <LearnerGate>{(l) => <Connector room={room} learner={l} onLeave={onLeave} />}</LearnerGate>;
+export function TutorSessionRoom({ learner, onLeave }: { learner?: Learner; onLeave?: () => void }) {
+  if (learner) return <Connector learner={learner} onLeave={onLeave} />;
+  return <LearnerGate>{(l) => <Connector learner={l} onLeave={onLeave} />}</LearnerGate>;
 }
 
-function Connector({ room, learner, onLeave }: { room: string; learner: Learner; onLeave?: () => void }) {
+function Connector({ learner, onLeave }: { learner: Learner; onLeave?: () => void }) {
   const [details, setDetails] = useState<ConnectionDetails | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    // Identity (learner.id) is a real platform_users UUID, not a free-text
-    // name — the agent uses it verbatim as user_id for continuity/state-
-    // injection queries (Section 4.4 / 4.1), so it has to be the real row id.
-    fetch(`/api/livekit-token?room=${encodeURIComponent(room)}&identity=${encodeURIComponent(learner.id)}`)
+    // Live classes are session-independent by design (see TutorLobby) —
+    // identity is resolved server-side from firstName + email against
+    // platform_users, not from a browser session or a client-supplied id.
+    fetch('/api/livekit-token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ firstName: learner.firstName, email: learner.email }),
+    })
       .then(async (res) => {
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
@@ -59,7 +55,7 @@ function Connector({ room, learner, onLeave }: { room: string; learner: Learner;
     return () => {
       cancelled = true;
     };
-  }, [room, learner.id]);
+  }, [learner.firstName, learner.email]);
 
   if (error) {
     return (
