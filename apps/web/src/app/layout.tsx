@@ -5,6 +5,7 @@ import { SiteFooter } from "@/components/layout/SiteFooter";
 import { AuthHashHandler } from "@/components/auth/AuthHashHandler";
 import { AuthErrorBanner } from "@/components/auth/AuthErrorBanner";
 import { ChatWidget } from "@/components/assistant/ChatWidget";
+import { PageTracker } from "@/components/analytics/PageTracker";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -36,6 +37,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col">
         <AuthErrorBanner />
         <AuthHashHandler />
+        <PageTracker />
         {children}
         <SiteFooter />
         <ChatWidget />

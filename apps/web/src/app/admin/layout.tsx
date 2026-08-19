@@ -19,6 +19,7 @@ const TABS = [
   { href: '/admin/waitlist', label: 'Waitlist' },
   { href: '/admin/submissions', label: 'Submissions' },
   { href: '/admin/quizzes', label: 'Quizzes' },
+  { href: '/admin/analytics', label: 'Analytics' },
   { href: '/admin/costs', label: 'Costs' },
 ];
 
