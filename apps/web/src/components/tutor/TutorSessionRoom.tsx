@@ -77,8 +77,15 @@ function Connector({ learner, onLeave }: { learner: Learner; onLeave?: () => voi
           <div className="animate-pulse">
             <LogoMark className="h-14 w-14" />
           </div>
-          <p className="font-serif text-lg font-semibold text-ink">Joining as {learner.firstName}…</p>
-          <p className="text-sm text-ink/50">Connecting you with your tutor</p>
+          <p className="font-serif text-lg font-semibold text-ink">Hi {learner.firstName},</p>
+          <p className="text-center text-sm text-ink/60">Your tutor will let you in shortly.</p>
+          <button
+            type="button"
+            onClick={() => onLeave?.()}
+            className="mt-2 rounded-full bg-red-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-red-700"
+          >
+            Hang up
+          </button>
         </main>
       </ClassroomShell>
     );

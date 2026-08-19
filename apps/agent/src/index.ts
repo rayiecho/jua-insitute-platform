@@ -14,6 +14,7 @@ import * as openai from '@livekit/agents-plugin-openai';
 import * as deepgram from '@livekit/agents-plugin-deepgram';
 import * as silero from '@livekit/agents-plugin-silero';
 import { TrackPublishOptions, TrackSource } from '@livekit/rtc-node';
+import { RoomServiceClient } from 'livekit-server-sdk';
 
 import { buildOpeningContext } from './continuity.js';
 import { StateInjector } from './state-injection.js';
@@ -34,6 +35,14 @@ const CLASS_DURATION_MINUTES = 45;
 const CLASS_DURATION_MS = CLASS_DURATION_MINUTES * 60 * 1000;
 const WIND_DOWN_WARNING_MS = CLASS_DURATION_MS - 3 * 60 * 1000; // 3 min before the end
 
+// The endClass tool was firing after just a few minutes on ordinary
+// conversation (confirmed live 2026-08-18/19 via Railway logs — the model
+// judged a learner explaining the new camera feature to someone nearby as
+// "disengaged"). A hard floor makes that class of over-eager call
+// structurally impossible for the first chunk of every session, regardless
+// of how the model reads the conversation.
+const MIN_MINUTES_BEFORE_END_CLASS = 10;
+
 // Section 4.1 / 4.2 / 4.3 of platform-technical-specification-mvp.md drive the
 // shape of this worker. Each numbered section below maps to one behavior
 // requirement from the spec — keep the mapping when this file grows.
@@ -50,19 +59,47 @@ export default defineAgent({
     // Hoisted so the same LLM instance can also drive context compaction
     // (Section 4.3) below, instead of spinning up a second one.
     const groqLlm = openai.LLM.withGroq({ model: 'openai/gpt-oss-20b' });
+    const sessionStartedAt = Date.now(); // Section 5/6 — cost monitoring; also gates endClassTool below
+
+    // Ends the class for BOTH sides. ctx.room.disconnect() only removes the
+    // agent's own participant — confirmed live 2026-08-18/19 that the
+    // learner's connection is untouched by it, so their client just sits in
+    // a now-empty room with no agent and no signal to leave, showing
+    // "waiting to connect" forever (exactly the bug reported). The learner
+    // has to be explicitly removed server-side so their client gets a real
+    // Disconnected event and actually returns to the lobby.
+    async function endSession() {
+      const apiKey = process.env.LIVEKIT_API_KEY;
+      const apiSecret = process.env.LIVEKIT_API_SECRET;
+      const serverUrl = process.env.LIVEKIT_URL;
+      if (apiKey && apiSecret && serverUrl && ctx.room.name) {
+        const rsc = new RoomServiceClient(serverUrl, apiKey, apiSecret);
+        await rsc.removeParticipant(ctx.room.name, learnerId).catch((err) => {
+          console.error('[endSession] failed to remove learner participant:', err);
+        });
+      }
+      await ctx.room.disconnect();
+    }
 
     // The tutor's own way to end a class early — the spec calls for this
     // explicitly ("if it sees the learner is not focused, they just end the
     // class"). True visual disengagement detection needs the vision work
     // that hasn't landed yet; until then this gives the tutor a real,
-    // usable exit when the learner is clearly checked out (repeated
-    // non-answers, explicitly asking to stop, going quiet for a long
-    // stretch), rather than being stuck narrating to no one.
+    // usable exit when the learner is clearly checked out. Confirmed live
+    // 2026-08-18/19 that the model called this after only a few minutes on
+    // ordinary conversation (a learner explaining the new camera feature to
+    // someone nearby) — the description below is deliberately stricter, and
+    // MIN_MINUTES_BEFORE_END_CLASS blocks it structurally regardless of
+    // what the model decides.
     const endClassTool = llm.tool({
       description:
-        "End the live class now. Use this only if the learner is clearly disengaged (repeatedly not responding, explicitly asking to end, or has been silent for a long stretch despite you checking in) — not just because the material is hard or they're thinking.",
+        "End the live class now. This is a LAST RESORT, not a normal way to wrap up — only use it if the learner has been unresponsive or clearly checked out for several minutes DESPITE you actively checking in more than once, or they explicitly ask to end the session. Talking about the platform, the camera, being tested, or anything off-topic is NOT disengagement — that's still an active, present learner. When in doubt, do not call this tool; keep teaching instead.",
       execute: async () => {
-        setTimeout(() => void ctx.room.disconnect(), 1500); // let the closing line finish playing
+        const minutesElapsed = (Date.now() - sessionStartedAt) / 60000;
+        if (minutesElapsed < MIN_MINUTES_BEFORE_END_CLASS) {
+          return `Too early to end the class (only ${minutesElapsed.toFixed(1)} minutes in) — keep teaching instead.`;
+        }
+        setTimeout(() => void endSession(), 1500); // let the closing line finish playing
         return 'Ending the class now.';
       },
     });
@@ -111,7 +148,6 @@ export default defineAgent({
     const stateInjector = new StateInjector(session, learnerId); // Section 4.1 — shared focus
     const compaction = new CompactionManager(session, ctx.room.name ?? 'unknown-room', groqLlm); // Section 4.3
     const handRaise = new HandRaiseListener(ctx.room, session); // live-class raise-hand
-    const sessionStartedAt = Date.now(); // Section 5/6 — cost monitoring
     let classTimers: ReturnType<typeof setTimeout>[] = [];
 
     // Section 4.2 — interruption must be a server-side event, not client-triggered, so it
@@ -191,7 +227,7 @@ export default defineAgent({
         });
       }, WIND_DOWN_WARNING_MS),
       setTimeout(() => {
-        void ctx.room.disconnect();
+        void endSession();
       }, CLASS_DURATION_MS),
     ];
 

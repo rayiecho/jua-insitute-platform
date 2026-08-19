@@ -19,8 +19,8 @@ import { SessionGuidePanel } from './SessionGuidePanel';
 import type { Learner } from '@/lib/learner';
 
 const AGENT_STATE_LABEL: Record<string, string> = {
-  disconnected: 'Waiting to connect…',
-  connecting: 'Connecting…',
+  disconnected: 'Your tutor will let you in shortly…',
+  connecting: 'Your tutor will let you in shortly…',
   initializing: 'Getting ready…',
   listening: 'Listening',
   thinking: 'Thinking…',
