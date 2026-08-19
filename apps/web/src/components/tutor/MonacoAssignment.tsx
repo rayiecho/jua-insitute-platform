@@ -93,26 +93,45 @@ export function MonacoAssignment({ learnerId, assignmentId, starterCode }: Monac
   const statusLabel: Record<SaveStatus, string> = {
     idle: '',
     saving: 'Saving…',
-    saved: 'Saved',
+    saved: 'Saved ✓',
     error: 'Failed to save',
   };
 
-  if (!loaded) return null;
+  if (!loaded) {
+    return (
+      <div className="flex h-[500px] items-center justify-center rounded-xl border border-border bg-card xl:h-full">
+        <p className="text-sm text-ink/40">Loading editor…</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex h-full flex-col gap-2">
-      <div className="flex flex-1 flex-col overflow-hidden rounded border border-gray-300">
-        <div className="flex items-center justify-between border-b border-gray-300 bg-gray-50 px-3 py-1.5 text-xs text-gray-500">
-          <span>assignment.py</span>
-          <span>{statusLabel[status]}</span>
+    <div className="flex h-[600px] flex-col gap-3 xl:h-full">
+      <div className="flex flex-1 flex-col overflow-hidden rounded-xl border border-border shadow-sm">
+        <div className="flex items-center justify-between border-b border-ink/10 bg-[#1e1e1e] px-4 py-2 text-xs text-white/60">
+          <span className="flex items-center gap-2 font-mono">
+            <span className="h-2.5 w-2.5 rounded-full bg-[#ff5f56]" />
+            <span className="h-2.5 w-2.5 rounded-full bg-[#ffbd2e]" />
+            <span className="h-2.5 w-2.5 rounded-full bg-[#27c93f]" />
+            <span className="ml-1">assignment.py</span>
+          </span>
+          <span className={status === 'error' ? 'text-red-400' : 'text-white/40'}>{statusLabel[status]}</span>
         </div>
         <div className="flex-1">
           <Editor
             height="100%"
             defaultLanguage="python"
+            theme="vs-dark"
             value={code}
             onChange={handleChange}
-            options={{ minimap: { enabled: false }, fontSize: 13 }}
+            options={{
+              minimap: { enabled: false },
+              fontSize: 14,
+              lineHeight: 22,
+              padding: { top: 16 },
+              scrollBeyondLastLine: false,
+              fontFamily: 'var(--font-mono), Menlo, Consolas, monospace',
+            }}
           />
         </div>
       </div>
@@ -121,23 +140,23 @@ export function MonacoAssignment({ learnerId, assignmentId, starterCode }: Monac
         type="button"
         onClick={handleSubmitForGrading}
         disabled={grading}
-        className="rounded bg-green-700 px-3 py-2 text-sm text-white disabled:opacity-50"
+        className="rounded-lg bg-gold px-4 py-3 text-sm font-semibold text-ink shadow-sm transition-colors hover:bg-gold-dark disabled:opacity-50"
       >
-        {grading ? 'Running…' : 'Submit for grading'}
+        {grading ? 'Running your code…' : 'Submit for grading'}
       </button>
 
       {grade && (
         <div
-          className={`rounded border p-3 text-sm ${
-            grade.gradingStatus === 'needs_revision' ? 'border-red-300 bg-red-50' : 'border-green-300 bg-green-50'
+          className={`rounded-xl border p-4 text-sm ${
+            grade.gradingStatus === 'needs_revision' ? 'border-red-300 bg-red-50' : 'border-gold bg-gold/10'
           }`}
         >
-          <p className="font-semibold">
+          <p className="font-serif text-base font-semibold text-ink">
             {grade.gradingStatus === 'needs_revision' ? "Doesn't run yet" : `Score: ${grade.score}`}
           </p>
-          {grade.feedback && <p className="mt-1 whitespace-pre-wrap">{grade.feedback}</p>}
+          {grade.feedback && <p className="mt-1.5 whitespace-pre-wrap text-ink/80">{grade.feedback}</p>}
           {grade.rawError && (
-            <pre className="mt-2 overflow-x-auto rounded bg-gray-900 p-2 text-xs text-gray-50">{grade.rawError}</pre>
+            <pre className="mt-3 overflow-x-auto rounded-lg bg-[#1e1e1e] p-3 text-xs text-white/90">{grade.rawError}</pre>
           )}
         </div>
       )}

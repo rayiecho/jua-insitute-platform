@@ -9,6 +9,13 @@ import { buildGradingScript, runPython } from '@/lib/sandbox';
 // perfectly well on its own. learnerId comes from the real session, not the
 // request body — a client-supplied id would let anyone submit and burn LLM
 // grading calls against another learner's assignment record.
+//
+// Two grading paths, branched on whether the assignment has
+// unit_test_suite_code: code assignments (Python, sandbox + tests + LLM
+// review) go through the original path below; written assignments (every
+// Entrepreneurship exercise — there's no code to execute for "submit your
+// Business Model Canvas") skip the sandbox entirely and go straight to an
+// LLM review of the text against the instructions.
 export async function POST(request: Request) {
   const authClient = await createServerSupabaseClient();
   const {
@@ -20,9 +27,10 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const assignmentId: string | undefined = body?.assignmentId;
   const code: string | undefined = body?.code;
+  const textResponse: string | undefined = body?.textResponse;
 
-  if (!assignmentId || typeof code !== 'string') {
-    return NextResponse.json({ error: 'assignmentId and code are required' }, { status: 400 });
+  if (!assignmentId || (typeof code !== 'string' && typeof textResponse !== 'string')) {
+    return NextResponse.json({ error: 'assignmentId and either code or textResponse are required' }, { status: 400 });
   }
 
   const supabase = createAdminClient();
@@ -36,8 +44,42 @@ export async function POST(request: Request) {
   if (assignmentError || !assignment) {
     return NextResponse.json({ error: 'assignment not found' }, { status: 404 });
   }
+
+  // Written assignment — no test suite configured means there's nothing to
+  // execute, this is a text submission graded on content alone.
   if (!assignment.unit_test_suite_code) {
-    return NextResponse.json({ error: 'assignment has no test suite configured' }, { status: 400 });
+    if (typeof textResponse !== 'string' || !textResponse.trim()) {
+      return NextResponse.json({ error: 'textResponse is required for this assignment' }, { status: 400 });
+    }
+
+    const review = await requestWrittenReview({
+      instructions: assignment.instructions_markdown,
+      response: textResponse,
+      maxScore: assignment.max_score,
+    });
+
+    await saveGrade(supabase, learnerId, assignmentId, {
+      grading_status: 'graded',
+      score_achieved: review.score,
+      ai_feedback_report: review.feedback,
+    });
+
+    if (assignment.node_id) {
+      await supabase
+        .from('lesson_completions')
+        .upsert({ user_id: learnerId, node_id: assignment.node_id }, { onConflict: 'user_id,node_id' });
+    }
+
+    return NextResponse.json({
+      gradingStatus: 'graded',
+      score: review.score,
+      rawError: null,
+      feedback: review.feedback,
+    });
+  }
+
+  if (typeof code !== 'string') {
+    return NextResponse.json({ error: 'code is required for this assignment' }, { status: 400 });
   }
 
   // Step 1 — always run in the sandbox first (Section 4.6.1).
@@ -63,7 +105,7 @@ export async function POST(request: Request) {
   // Step 3 — compiled/ran (whether tests passed or failed): bundle for an LLM
   // audit. This is the only path that costs real AI tokens (Section 4.6.4).
   const testsPassed = result.exitedCleanly && result.output.includes('ALL_TESTS_PASSED');
-  const review = await requestLLMReview({
+  const review = await requestCodeReview({
     instructions: assignment.instructions_markdown,
     studentCode: code,
     testsPassed,
@@ -116,7 +158,7 @@ interface LLMReview {
 // No ANTHROPIC_API_KEY configured yet, so this runs on Groq as a stand-in —
 // same substitution already made for the live-tutoring LLM in apps/agent.
 // Swap the model/endpoint here once Anthropic access exists.
-async function requestLLMReview(input: {
+async function requestCodeReview(input: {
   instructions: string;
   studentCode: string;
   testsPassed: boolean;
@@ -182,5 +224,64 @@ out loud. Respond with ONLY a JSON object: {"score": <integer 0-${input.maxScore
       score: input.testsPassed ? input.maxScore : 0,
       feedback: content || 'Could not parse review response.',
     };
+  }
+}
+
+// Written-assignment counterpart to requestCodeReview — no sandbox, no test
+// suite, just an honest review of the submitted text against the
+// instructions. This is what every Entrepreneurship exercise uses (there's
+// no code to run for "submit your validated problem statement").
+async function requestWrittenReview(input: {
+  instructions: string;
+  response: string;
+  maxScore: number;
+}): Promise<LLMReview> {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) {
+    return {
+      score: Math.round(input.maxScore * 0.7),
+      feedback: 'Submitted. (No LLM configured for review yet — this is a placeholder score.)',
+    };
+  }
+
+  const prompt = `You are a tutor reviewing a learner's written assignment submission for an entrepreneurship program.
+
+Assignment instructions:
+${input.instructions}
+
+Learner's submission:
+${input.response}
+
+Judge the submission on whether it genuinely follows the instructions and shows real, specific thinking — not on
+writing quality or length. A short, sharp, specific answer should score higher than a long vague one. If the
+submission is clearly incomplete or ignores the instructions, say so honestly and score accordingly.
+
+Score out of ${input.maxScore} and give brief, specific, encouraging feedback (2-4 sentences) a tutor could say
+out loud — mention one concrete strength and one concrete thing to sharpen. Respond with ONLY a JSON object:
+{"score": <integer 0-${input.maxScore}>, "feedback": "<string>"}`;
+
+  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'openai/gpt-oss-20b',
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 500,
+      response_format: { type: 'json_object' },
+    }),
+  });
+
+  if (!res.ok) {
+    return { score: Math.round(input.maxScore * 0.7), feedback: 'Submitted. (LLM review unavailable right now.)' };
+  }
+
+  const data = await res.json();
+  const content: string = data.choices?.[0]?.message?.content ?? '{}';
+  try {
+    const parsed = JSON.parse(content);
+    const score = Math.max(0, Math.min(input.maxScore, Number(parsed.score) || 0));
+    return { score, feedback: String(parsed.feedback ?? '') };
+  } catch {
+    return { score: Math.round(input.maxScore * 0.7), feedback: content || 'Could not parse review response.' };
   }
 }

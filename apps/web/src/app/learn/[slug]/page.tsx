@@ -189,7 +189,7 @@ export default async function LessonPage({ params }: { params: Promise<{ slug: s
 
   const { data: assignment } = await supabase
     .from('course_assignments')
-    .select('id, title, instructions_markdown, starter_code')
+    .select('id, title, instructions_markdown, starter_code, unit_test_suite_code')
     .eq('node_id', node.id)
     .limit(1)
     .maybeSingle();
@@ -231,7 +231,11 @@ export default async function LessonPage({ params }: { params: Promise<{ slug: s
               {lessonNav}
             </div>
             <div className="xl:sticky xl:top-10 xl:h-[calc(100vh-5rem)]">
-              <AssignmentPanel assignmentId={assignment.id} starterCode={assignment.starter_code ?? ''} />
+              <AssignmentPanel
+                assignmentId={assignment.id}
+                starterCode={assignment.starter_code ?? ''}
+                isCodeAssignment={Boolean(assignment.unit_test_suite_code)}
+              />
             </div>
           </div>
         </main>
