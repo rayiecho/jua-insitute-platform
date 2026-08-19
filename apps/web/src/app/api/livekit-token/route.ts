@@ -12,8 +12,17 @@ const AGENT_NAME = 'ai-tutor'; // must match ServerOptions.agentName in apps/age
 // if not enrolled" is still enforced — verification and enrollment happen
 // once, at application time (lib/auth/provision.ts) — this just doesn't
 // require the *browser* to still be carrying that session later.
+//
+// courseId is optional and only meaningful for a learner enrolled in more
+// than one program — TutorLobby's program picker sends it so the tutor
+// coaches on the program the learner actually means, instead of guessing
+// from whichever they touched most recently (see resolveActiveNode).
 export async function POST(request: Request) {
-  const { firstName, email } = (await request.json()) as { firstName?: string; email?: string };
+  const { firstName, email, courseId } = (await request.json()) as {
+    firstName?: string;
+    email?: string;
+    courseId?: string;
+  };
   if (!firstName?.trim() || !email?.trim()) {
     return NextResponse.json({ error: 'firstName and email are required' }, { status: 400 });
   }
@@ -29,10 +38,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'not_verified' }, { status: 403 });
   }
 
-  const { data: anyEnrollment } = await admin.from('enrollments').select('id').eq('user_id', learner.id).limit(1);
-  if (!anyEnrollment || anyEnrollment.length === 0) {
+  const { data: enrollments } = await admin.from('enrollments').select('course_id').eq('user_id', learner.id);
+  if (!enrollments || enrollments.length === 0) {
     return NextResponse.json({ error: 'not_enrolled' }, { status: 403 });
   }
+  // A client-supplied courseId that this learner isn't actually enrolled in
+  // would let them impersonate progress in a program they never joined —
+  // only honor it if it's really one of theirs, silently ignore otherwise.
+  const validCourseId = courseId && enrollments.some((e) => e.course_id === courseId) ? courseId : undefined;
 
   const identity = learner.id;
   const room = `learner-${identity}`;
@@ -73,10 +86,14 @@ export async function POST(request: Request) {
   const dispatchClient = new AgentDispatchClient(serverUrl, apiKey, apiSecret);
   const existingDispatches = await dispatchClient.listDispatch(room);
   if (!existingDispatches.some((d) => d.agentName === AGENT_NAME)) {
-    await dispatchClient.createDispatch(room, AGENT_NAME, { metadata: identity });
+    // JSON-encoded so the agent (apps/agent/src/index.ts) can pull both the
+    // learner id and, when given, which program this class is for.
+    await dispatchClient.createDispatch(room, AGENT_NAME, {
+      metadata: JSON.stringify({ learnerId: identity, courseId: validCourseId ?? null }),
+    });
   }
 
-  await ensureSessionCurriculumContext(room, identity);
+  await ensureSessionCurriculumContext(room, identity, validCourseId);
 
   return NextResponse.json({
     token: await token.toJwt(),
@@ -89,7 +106,7 @@ export async function POST(request: Request) {
   });
 }
 
-async function ensureSessionCurriculumContext(room: string, userId: string) {
+async function ensureSessionCurriculumContext(room: string, userId: string, courseId?: string) {
   const supabase = createAdminClient();
 
   let { data: session } = await supabase
@@ -123,7 +140,7 @@ async function ensureSessionCurriculumContext(room: string, userId: string) {
   // the learner actually is *now*, not wherever they were on their first-ever
   // tutor visit. continuity.ts already reads the most recent row by
   // created_at, so older rows are just harmless history.
-  const active = await resolveActiveNode(supabase, userId);
+  const active = await resolveActiveNode(supabase, userId, courseId);
   if (!active) return; // not enrolled in a program yet — nothing to link
 
   await supabase.from('session_curriculum_context').insert({
@@ -137,17 +154,17 @@ async function ensureSessionCurriculumContext(room: string, userId: string) {
 async function resolveActiveNode(
   supabase: ReturnType<typeof createAdminClient>,
   userId: string,
+  courseId?: string,
 ): Promise<{ nodeId: string; assignmentId: string | null } | null> {
-  // The learner's most recently touched enrollment decides which PROGRAM the
-  // tutor coaches on (Section 4.4) — no more guessing "the first course".
-  const { data: enrollment } = await supabase
-    .from('enrollments')
-    .select('course_id, last_viewed_node_id')
-    .eq('user_id', userId)
-    .order('last_viewed_at', { ascending: false, nullsFirst: false })
-    .order('enrolled_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  // If the learner explicitly picked a program (multi-enrollment case),
+  // honor that over guessing from recency. Otherwise fall back to whichever
+  // enrollment they touched most recently (Section 4.4) — still far better
+  // than the old "guess the first course" behavior.
+  let enrollmentQuery = supabase.from('enrollments').select('course_id, last_viewed_node_id').eq('user_id', userId);
+  enrollmentQuery = courseId
+    ? enrollmentQuery.eq('course_id', courseId)
+    : enrollmentQuery.order('last_viewed_at', { ascending: false, nullsFirst: false }).order('enrolled_at', { ascending: false });
+  const { data: enrollment } = await enrollmentQuery.limit(1).maybeSingle();
 
   if (!enrollment) return null; // hasn't enrolled in anything yet
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Editor from '@monaco-editor/react';
+import { LessonHelpChat } from './LessonHelpChat';
 
 const DEBOUNCE_MS = 1750; // matches the agent's shared-focus debounce (Section 4.1, Section 7)
 
@@ -9,6 +10,8 @@ interface MonacoAssignmentProps {
   learnerId: string;
   assignmentId: string;
   starterCode: string;
+  lessonTitle: string;
+  instructions: string;
 }
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
@@ -20,7 +23,7 @@ interface GradeResult {
   feedback: string | null;
 }
 
-export function MonacoAssignment({ learnerId, assignmentId, starterCode }: MonacoAssignmentProps) {
+export function MonacoAssignment({ learnerId, assignmentId, starterCode, lessonTitle, instructions }: MonacoAssignmentProps) {
   const [code, setCode] = useState(starterCode);
   const [status, setStatus] = useState<SaveStatus>('idle');
   const [loaded, setLoaded] = useState(false);
@@ -160,6 +163,16 @@ export function MonacoAssignment({ learnerId, assignmentId, starterCode }: Monac
           )}
         </div>
       )}
+
+      <LessonHelpChat
+        autoOpen={grade != null && (grade.gradingStatus === 'needs_revision' || grade.score < 70)}
+        context={{
+          lessonTitle,
+          assignmentInstructions: instructions,
+          studentSubmission: code,
+          feedback: grade?.feedback ?? grade?.rawError ?? undefined,
+        }}
+      />
     </div>
   );
 }

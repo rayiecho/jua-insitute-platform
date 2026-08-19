@@ -4,6 +4,7 @@ import ReactMarkdown from 'react-markdown';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { AssignmentPanel } from '@/components/tutor/AssignmentPanel';
+import { LessonHelpChat } from '@/components/tutor/LessonHelpChat';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { YouTubeEmbed } from '@/components/programs/YouTubeEmbed';
 import { LessonViewTracker } from '@/components/programs/LessonViewTracker';
@@ -215,6 +216,13 @@ export default async function LessonPage({ params }: { params: Promise<{ slug: s
       {/* Assignment-backed lessons complete via grading (see /api/grade), not
           this button — the assignment panel already provides that signal. */}
       {!assignment && <MarkCompleteButton nodeId={node.id} alreadyDone={isComplete} />}
+      {/* Assignment lessons get their own LessonHelpChat inside
+          AssignmentPanel, scoped to the submission — this one covers every
+          other lesson type (readings, videos, quizzes) so help is genuinely
+          always available, not just after a failed grade. */}
+      {!assignment && (
+        <LessonHelpChat context={{ lessonTitle: node.title, lessonContent: node.markdown_content }} />
+      )}
     </article>
   );
 
@@ -235,6 +243,8 @@ export default async function LessonPage({ params }: { params: Promise<{ slug: s
                 assignmentId={assignment.id}
                 starterCode={assignment.starter_code ?? ''}
                 isCodeAssignment={Boolean(assignment.unit_test_suite_code)}
+                lessonTitle={node.title}
+                instructions={assignment.instructions_markdown}
               />
             </div>
           </div>

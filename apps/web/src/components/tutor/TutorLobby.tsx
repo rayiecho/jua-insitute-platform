@@ -11,6 +11,11 @@ import type { Learner } from '@/lib/learner';
 
 type Status = 'idle' | 'checking' | 'not_found' | 'not_verified' | 'not_enrolled' | 'ready' | 'in-session';
 
+interface Program {
+  courseId: string;
+  title: string;
+}
+
 // The live-class entry ritual — deliberately independent of the browser's
 // auth session. A learner types their first name and email every time; the
 // tutor is resolved from that against platform_users (verified at
@@ -19,12 +24,17 @@ type Status = 'idle' | 'checking' | 'not_found' | 'not_verified' | 'not_enrolled
 // isn't enrolled in anything, this stops here with a clear next step —
 // nothing ever reaches the room or the agent for someone who hasn't
 // enrolled. "Not verified yet" sends a code right here (OtpVerifyForm)
-// rather than sending them off to click an email link.
+// rather than sending them off to click an email link. A learner enrolled
+// in more than one program picks which one this class is for — without
+// that, the tutor could only guess from whichever program was touched most
+// recently, which is exactly wrong the moment someone is juggling two.
 export function TutorLobby() {
   const [status, setStatus] = useState<Status>('idle');
   const [firstName, setFirstName] = useState('');
   const [email, setEmail] = useState('');
   const [resolvedFirstName, setResolvedFirstName] = useState('');
+  const [programs, setPrograms] = useState<Program[]>([]);
+  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [codeSent, setCodeSent] = useState(false);
 
@@ -36,7 +46,12 @@ export function TutorLobby() {
     });
     const data = await res.json();
     setStatus(data.status);
-    if (data.status === 'ready') setResolvedFirstName(data.firstName || firstName);
+    if (data.status === 'ready') {
+      setResolvedFirstName(data.firstName || firstName);
+      const progs: Program[] = data.programs ?? [];
+      setPrograms(progs);
+      setSelectedCourseId(progs.length === 1 ? progs[0].courseId : null);
+    }
     return data.status as Status;
   }
 
@@ -63,7 +78,13 @@ export function TutorLobby() {
 
   if (status === 'in-session') {
     const learner: Learner = { id: '', firstName: resolvedFirstName || firstName, lastName: '', email };
-    return <TutorSessionRoom learner={learner} onLeave={() => setStatus('ready')} />;
+    return (
+      <TutorSessionRoom
+        learner={learner}
+        courseId={selectedCourseId ?? undefined}
+        onLeave={() => setStatus('ready')}
+      />
+    );
   }
 
   return (
@@ -150,7 +171,26 @@ export function TutorLobby() {
           />
         )}
 
-        {status === 'ready' && (
+        {status === 'ready' && programs.length > 1 && !selectedCourseId && (
+          <div className="mt-8 flex w-full flex-col items-center gap-4 rounded-2xl border border-border bg-card px-6 py-10 text-center shadow-sm sm:px-8">
+            <p className="font-serif text-xl font-semibold text-ink">Which class, {resolvedFirstName}?</p>
+            <p className="text-sm text-ink/60">You're enrolled in more than one program — pick which one this class is for.</p>
+            <div className="mt-2 flex w-full flex-col gap-2">
+              {programs.map((p) => (
+                <button
+                  key={p.courseId}
+                  type="button"
+                  onClick={() => setSelectedCourseId(p.courseId)}
+                  className="w-full rounded border border-border bg-background px-4 py-3 text-sm font-medium text-ink hover:border-gold hover:bg-gold/10"
+                >
+                  {p.title}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {status === 'ready' && (programs.length <= 1 || selectedCourseId) && (
           <div className="mt-8 flex w-full flex-col items-center gap-4 rounded-2xl border border-border bg-card px-6 py-10 text-center shadow-sm sm:px-8">
             <p className="font-serif text-xl font-semibold text-ink">Ready, {resolvedFirstName}?</p>
             <p className="text-sm text-ink/60">Your tutor will be with you as soon as you join.</p>

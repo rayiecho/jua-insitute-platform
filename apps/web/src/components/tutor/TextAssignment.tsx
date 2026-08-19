@@ -1,12 +1,15 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { LessonHelpChat } from './LessonHelpChat';
 
 const DEBOUNCE_MS = 1750; // matches MonacoAssignment's autosave cadence
 
 interface TextAssignmentProps {
   learnerId: string;
   assignmentId: string;
+  lessonTitle: string;
+  instructions: string;
 }
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
@@ -24,7 +27,7 @@ interface GradeResult {
 // autosaving textarea instead of a code editor, wired to the same
 // /api/progress and /api/grade endpoints (which branch on whether the
 // assignment has a unit_test_suite_code — see api/grade/route.ts).
-export function TextAssignment({ learnerId, assignmentId }: TextAssignmentProps) {
+export function TextAssignment({ learnerId, assignmentId, lessonTitle, instructions }: TextAssignmentProps) {
   const [response, setResponse] = useState('');
   const [status, setStatus] = useState<SaveStatus>('idle');
   const [loaded, setLoaded] = useState(false);
@@ -137,6 +140,16 @@ export function TextAssignment({ learnerId, assignmentId }: TextAssignmentProps)
           {grade.feedback && <p className="mt-1.5 whitespace-pre-wrap text-ink/80">{grade.feedback}</p>}
         </div>
       )}
+
+      <LessonHelpChat
+        autoOpen={grade != null && grade.score < 70}
+        context={{
+          lessonTitle,
+          assignmentInstructions: instructions,
+          studentSubmission: response,
+          feedback: grade?.feedback ?? undefined,
+        }}
+      />
     </div>
   );
 }

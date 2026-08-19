@@ -8,8 +8,8 @@ export interface OpeningContext {
 
 // Section 4.4 — "Pick up where we left off". Runs once at session start,
 // before the tutor speaks.
-export async function buildOpeningContext(learnerId: string): Promise<OpeningContext> {
-  const curriculumContext = await fetchCurrentCurriculumContext(learnerId);
+export async function buildOpeningContext(learnerId: string, courseId?: string): Promise<OpeningContext> {
+  const curriculumContext = await fetchCurrentCurriculumContext(learnerId, courseId);
   const memories = await fetchRecentSessionSummaries(learnerId);
 
   const parts: string[] = [
@@ -104,15 +104,22 @@ interface CurrentCurriculumContext {
 // enrolled in and working through Entrepreneurship. Computing this fresh
 // each time makes that class of bug structurally impossible: there's no
 // history to go stale.
-async function fetchCurrentCurriculumContext(learnerId: string): Promise<CurrentCurriculumContext | null> {
-  const { data: enrollment } = await supabase
+async function fetchCurrentCurriculumContext(
+  learnerId: string,
+  courseId?: string,
+): Promise<CurrentCurriculumContext | null> {
+  // A learner enrolled in more than one program picks which one this class
+  // is for at join time (TutorLobby's program picker) — honor that over
+  // guessing from recency, mirroring resolveActiveNode in
+  // apps/web/src/app/api/livekit-token/route.ts.
+  let enrollmentQuery = supabase
     .from('enrollments')
     .select('course_id, last_viewed_node_id, course:courses(title)')
-    .eq('user_id', learnerId)
-    .order('last_viewed_at', { ascending: false, nullsFirst: false })
-    .order('enrolled_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .eq('user_id', learnerId);
+  enrollmentQuery = courseId
+    ? enrollmentQuery.eq('course_id', courseId)
+    : enrollmentQuery.order('last_viewed_at', { ascending: false, nullsFirst: false }).order('enrolled_at', { ascending: false });
+  const { data: enrollment } = await enrollmentQuery.limit(1).maybeSingle();
 
   if (!enrollment) return null; // not enrolled in anything — nothing to teach from
   const course = Array.isArray(enrollment.course) ? enrollment.course[0] : enrollment.course;

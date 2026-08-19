@@ -49,12 +49,27 @@ const MIN_MINUTES_BEFORE_END_CLASS = 10;
 
 export default defineAgent({
   entry: async (ctx: JobContext) => {
-    // TODO(Phase 2): resolve real learnerId/sessionId from ctx.room metadata
-    // or job dispatch metadata once the booking flow exists. Placeholder wiring
-    // for now so the loop is end-to-end runnable against a test room.
-    const learnerId = ctx.job.metadata || 'unknown-learner';
+    // Dispatch metadata is JSON now (see apps/web/src/app/api/livekit-token/
+    // route.ts): { learnerId, courseId }. courseId is only present when a
+    // learner enrolled in more than one program explicitly picked which one
+    // this class is for. Falls back to treating raw metadata as a bare
+    // learnerId string for robustness against any other dispatch path that
+    // hasn't been updated to the JSON shape.
+    let learnerId = 'unknown-learner';
+    let courseId: string | undefined;
+    try {
+      const parsed = JSON.parse(ctx.job.metadata || '{}');
+      if (parsed && typeof parsed === 'object' && parsed.learnerId) {
+        learnerId = parsed.learnerId;
+        courseId = parsed.courseId ?? undefined;
+      } else {
+        learnerId = ctx.job.metadata || 'unknown-learner';
+      }
+    } catch {
+      learnerId = ctx.job.metadata || 'unknown-learner';
+    }
 
-    const opening = await buildOpeningContext(learnerId); // Section 4.4
+    const opening = await buildOpeningContext(learnerId, courseId); // Section 4.4
 
     // Hoisted so the same LLM instance can also drive context compaction
     // (Section 4.3) below, instead of spinning up a second one.

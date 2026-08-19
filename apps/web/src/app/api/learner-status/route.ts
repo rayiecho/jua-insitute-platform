@@ -26,10 +26,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ status: 'not_verified' });
   }
 
-  const { data: enrollment } = await admin.from('enrollments').select('id').eq('user_id', learner.id).limit(1);
-  if (!enrollment || enrollment.length === 0) {
+  // Full list, not just an existence check — a learner enrolled in more than
+  // one program needs to pick which one this class is for (see TutorLobby),
+  // rather than the tutor silently guessing from whichever they touched most
+  // recently.
+  const { data: enrollments } = await admin
+    .from('enrollments')
+    .select('course_id, course:courses(title)')
+    .eq('user_id', learner.id);
+
+  if (!enrollments || enrollments.length === 0) {
     return NextResponse.json({ status: 'not_enrolled' });
   }
 
-  return NextResponse.json({ status: 'ready', firstName: learner.first_name });
+  const programs = enrollments.map((e) => {
+    const course = Array.isArray(e.course) ? e.course[0] : e.course;
+    return { courseId: e.course_id, title: course?.title ?? 'Program' };
+  });
+
+  return NextResponse.json({ status: 'ready', firstName: learner.first_name, programs });
 }

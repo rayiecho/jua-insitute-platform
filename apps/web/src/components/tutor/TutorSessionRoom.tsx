@@ -20,12 +20,20 @@ interface ConnectionDetails {
 // connecting. `onLeave` lets a caller (TutorLobby) return to its own "ready
 // to join again?" screen instead of this component silently trying to
 // reconnect on its own.
-export function TutorSessionRoom({ learner, onLeave }: { learner?: Learner; onLeave?: () => void }) {
-  if (learner) return <Connector learner={learner} onLeave={onLeave} />;
-  return <LearnerGate>{(l) => <Connector learner={l} onLeave={onLeave} />}</LearnerGate>;
+export function TutorSessionRoom({
+  learner,
+  courseId,
+  onLeave,
+}: {
+  learner?: Learner;
+  courseId?: string;
+  onLeave?: () => void;
+}) {
+  if (learner) return <Connector learner={learner} courseId={courseId} onLeave={onLeave} />;
+  return <LearnerGate>{(l) => <Connector learner={l} courseId={courseId} onLeave={onLeave} />}</LearnerGate>;
 }
 
-function Connector({ learner, onLeave }: { learner: Learner; onLeave?: () => void }) {
+function Connector({ learner, courseId, onLeave }: { learner: Learner; courseId?: string; onLeave?: () => void }) {
   const [details, setDetails] = useState<ConnectionDetails | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,10 +42,14 @@ function Connector({ learner, onLeave }: { learner: Learner; onLeave?: () => voi
     // Live classes are session-independent by design (see TutorLobby) —
     // identity is resolved server-side from firstName + email against
     // platform_users, not from a browser session or a client-supplied id.
+    // courseId is only meaningful when the learner has more than one
+    // enrollment — TutorLobby collects it via a program picker so the tutor
+    // coaches on the program the learner actually means, instead of
+    // guessing from whichever they touched most recently.
     fetch('/api/livekit-token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ firstName: learner.firstName, email: learner.email }),
+      body: JSON.stringify({ firstName: learner.firstName, email: learner.email, courseId }),
     })
       .then(async (res) => {
         if (!res.ok) {
@@ -58,7 +70,7 @@ function Connector({ learner, onLeave }: { learner: Learner; onLeave?: () => voi
     return () => {
       cancelled = true;
     };
-  }, [learner.firstName, learner.email]);
+  }, [learner.firstName, learner.email, courseId]);
 
   if (error) {
     return (
