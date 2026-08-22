@@ -1,0 +1,41 @@
+name: Deploy web to Cloudflare Workers
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "apps/web/**"
+      - "package-lock.json"
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Runs at the monorepo root so workspace hoisting resolves the same
+      # way it does locally — apps/web alone can't see hoisted deps like
+      # `next` or `wrangler` otherwise (confirmed live 2026-08-22).
+      - name: Install dependencies
+        working-directory: .
+        run: npm install
+
+      # NEXT_PUBLIC_* vars are inlined into the client bundle at build time,
+      # not read at runtime — they have to be here, not just as Worker
+      # secrets. Both are the public anon key/URL, safe to be plain secrets
+      # rather than requiring extra protection.
+      - name: Build and deploy
+        run: npm run cf:deploy
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
