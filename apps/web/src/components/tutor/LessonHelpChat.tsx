@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import ReactMarkdown from 'react-markdown';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -92,11 +93,11 @@ export function LessonHelpChat({ context, autoOpen = false }: { context: LessonH
           {messages.map((m, i) => (
             <div
               key={i}
-              className={`max-w-[90%] rounded-xl px-3 py-2 text-sm leading-relaxed ${
+              className={`max-w-[90%] rounded-xl px-3 py-2 text-sm leading-relaxed [&_p]:m-0 [&_strong]:font-semibold ${
                 m.role === 'user' ? 'ml-auto bg-gold text-ink' : 'bg-background text-ink'
               }`}
             >
-              {m.content}
+              {m.role === 'assistant' ? <ReactMarkdown>{m.content}</ReactMarkdown> : m.content}
             </div>
           ))}
           {sending && <div className="max-w-[90%] rounded-xl bg-background px-3 py-2 text-sm text-ink/50">Thinking…</div>}

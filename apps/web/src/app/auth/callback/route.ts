@@ -26,5 +26,5 @@ export async function GET(request: Request) {
   const admin = createAdminClient();
   const { redirectTo } = await provisionAndVerify(admin, data.user);
 
-  return NextResponse.redirect(`${origin}${redirectTo}`);
+  return NextResponse.redirect(`${origin}${redirectTo ?? '/dashboard'}`);
 }

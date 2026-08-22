@@ -16,12 +16,14 @@ import * as silero from '@livekit/agents-plugin-silero';
 import { TrackPublishOptions, TrackSource } from '@livekit/rtc-node';
 import { RoomServiceClient } from 'livekit-server-sdk';
 
-import { buildOpeningContext } from './continuity.js';
+import { buildOpeningContext, buildGroupOpeningContext } from './continuity.js';
 import { StateInjector } from './state-injection.js';
 import { CompactionManager } from './compaction.js';
 import { logConnectionEvent } from './supabase.js';
 import { logSessionUsage } from './cost-tracking.js';
 import { HandRaiseListener, publishPreparedVideo } from './room-interactions.js';
+import { createTeachingScreenTools } from './teaching-screen.js';
+import { ChatListener } from './chat-listener.js';
 import { SimliAvatarSession } from './simli-avatar.js';
 
 // Live classes are capped at 45 minutes — deliberately shorter than
@@ -50,16 +52,19 @@ const MIN_MINUTES_BEFORE_END_CLASS = 10;
 export default defineAgent({
   entry: async (ctx: JobContext) => {
     // Dispatch metadata is JSON now (see apps/web/src/app/api/livekit-token/
-    // route.ts): { learnerId, courseId }. courseId is only present when a
-    // learner enrolled in more than one program explicitly picked which one
-    // this class is for. Falls back to treating raw metadata as a bare
-    // learnerId string for robustness against any other dispatch path that
-    // hasn't been updated to the JSON shape.
+    // route.ts). Scheduled cohort classes send { classSessionId } — several
+    // learners share one room and the tutor teaches the group. The older
+    // { learnerId, courseId } shape (and a bare-string fallback) is kept for
+    // robustness against any dispatch path that hasn't moved to the group
+    // model.
     let learnerId = 'unknown-learner';
     let courseId: string | undefined;
+    let classSessionId: string | undefined;
     try {
       const parsed = JSON.parse(ctx.job.metadata || '{}');
-      if (parsed && typeof parsed === 'object' && parsed.learnerId) {
+      if (parsed && typeof parsed === 'object' && parsed.classSessionId) {
+        classSessionId = parsed.classSessionId;
+      } else if (parsed && typeof parsed === 'object' && parsed.learnerId) {
         learnerId = parsed.learnerId;
         courseId = parsed.courseId ?? undefined;
       } else {
@@ -69,7 +74,10 @@ export default defineAgent({
       learnerId = ctx.job.metadata || 'unknown-learner';
     }
 
-    const opening = await buildOpeningContext(learnerId, courseId); // Section 4.4
+    const isGroupClass = Boolean(classSessionId);
+    const opening = isGroupClass
+      ? await buildGroupOpeningContext(classSessionId!)
+      : await buildOpeningContext(learnerId, courseId); // Section 4.4
 
     // Hoisted so the same LLM instance can also drive context compaction
     // (Section 4.3) below, instead of spinning up a second one.
@@ -89,9 +97,25 @@ export default defineAgent({
       const serverUrl = process.env.LIVEKIT_URL;
       if (apiKey && apiSecret && serverUrl && ctx.room.name) {
         const rsc = new RoomServiceClient(serverUrl, apiKey, apiSecret);
-        await rsc.removeParticipant(ctx.room.name, learnerId).catch((err) => {
-          console.error('[endSession] failed to remove learner participant:', err);
-        });
+        if (isGroupClass) {
+          // A cohort class can have several learners in the room — remove
+          // everyone except the agent's own participant, not just one identity.
+          const ownIdentity = ctx.room.localParticipant?.identity;
+          const participants = await rsc.listParticipants(ctx.room.name).catch(() => []);
+          await Promise.all(
+            participants
+              .filter((p) => p.identity !== ownIdentity)
+              .map((p) =>
+                rsc.removeParticipant(ctx.room.name!, p.identity).catch((err) => {
+                  console.error('[endSession] failed to remove participant', p.identity, err);
+                }),
+              ),
+          );
+        } else {
+          await rsc.removeParticipant(ctx.room.name, learnerId).catch((err) => {
+            console.error('[endSession] failed to remove learner participant:', err);
+          });
+        }
       }
       await ctx.room.disconnect();
     }
@@ -160,9 +184,14 @@ export default defineAgent({
       },
     });
 
-    const stateInjector = new StateInjector(session, learnerId); // Section 4.1 — shared focus
+    // Shared-focus code-state injection assumes one learner's editor state
+    // maps onto the session — that doesn't hold for a group class with
+    // several learners each possibly looking at different things, so it's
+    // simply not wired up for classSessionId-based dispatch.
+    const stateInjector = isGroupClass ? null : new StateInjector(session, learnerId); // Section 4.1 — shared focus
     const compaction = new CompactionManager(session, ctx.room.name ?? 'unknown-room', groqLlm); // Section 4.3
     const handRaise = new HandRaiseListener(ctx.room, session); // live-class raise-hand
+    const chatListener = new ChatListener(ctx.room, session); // live-class typed chat
     let classTimers: ReturnType<typeof setTimeout>[] = [];
 
     // Section 4.2 — interruption must be a server-side event, not client-triggered, so it
@@ -171,12 +200,13 @@ export default defineAgent({
     // hook point for additional server-side cleanup if that turns out to be insufficient
     // once real mobile testing starts, and also drives the shared-focus flush (Section 4.1).
     session.on(AgentSessionEventTypes.UserStateChanged, (ev) => {
-      if (ev.newState === 'speaking') stateInjector.flushOnSpeechStart();
+      if (ev.newState === 'speaking') stateInjector?.flushOnSpeechStart();
     });
     session.on(AgentSessionEventTypes.Close, () => {
-      stateInjector.dispose();
+      stateInjector?.dispose();
       compaction.dispose();
       handRaise.dispose();
+      chatListener.dispose();
       classTimers.forEach(clearTimeout);
       void logSessionUsage(session, ctx.room.name ?? 'unknown-room', sessionStartedAt);
     });
@@ -222,9 +252,38 @@ export default defineAgent({
       }
     }
 
+    const { showCode, showSlide } = createTeachingScreenTools(ctx.room);
+    // Confirmed live 2026-08-19: with showCode available in every course,
+    // the tutor wrote a Python pandas demo mid-Entrepreneurship-class as an
+    // "illustration" of a data concept — the tool being merely described as
+    // Python-only wasn't enough to stop it reaching for it. There's no
+    // course category column in the schema (courses only has title/
+    // description/difficulty_level), so this is a title heuristic; revisit
+    // if a real "track" column gets added later.
+    const isProgrammingCourse = /python|program|coding|software|developer/i.test(opening.courseTitle ?? '');
+
     await session.start({
-      agent: voice.Agent.create({ instructions: opening.systemPrompt, tools: { endClass: endClassTool } }),
+      agent: voice.Agent.create({
+        instructions: opening.systemPrompt,
+        tools: isProgrammingCourse
+          ? { endClass: endClassTool, showCode, showSlide }
+          : { endClass: endClassTool, showSlide },
+      }),
       room: ctx.room,
+      // RoomIO's default (closeOnDisconnect: true) tears down the whole
+      // agent session the moment the ONE participant it's linked to
+      // disconnects — built for 1-on-1. Confirmed live 2026-08-19 via a
+      // real two-learner Entrepreneurship class: a learner joining ~7
+      // minutes after the first (a genuinely ordinary "joined late", not a
+      // disconnect) landed on a freshly restarted session that re-ran the
+      // opening welcome from scratch instead of continuing — the first
+      // learner's brief connection hiccup around then closed the session,
+      // and the next join re-triggered a whole new job. For a scheduled
+      // class with several learners coming and going, the class itself
+      // should keep running until the hard time cap (or endClassTool),
+      // never collapse just because whichever participant it happened to
+      // link to first drops out.
+      inputOptions: isGroupClass ? { closeOnDisconnect: false } : undefined,
     });
 
     await ctx.connect();

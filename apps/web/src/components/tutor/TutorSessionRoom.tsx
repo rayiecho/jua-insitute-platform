@@ -118,6 +118,13 @@ function Connector({ learner, courseId, onLeave }: { learner: Learner; courseId?
       className="min-h-screen"
     >
       <TutorSessionUI learner={learner} />
+      {/* Reverted the volume={1.6} boost (2026-08-19): setting a non-default
+          volume switches livekit-client's playback onto a WebAudio
+          AudioContext + gain-node path instead of a plain <audio> element,
+          and confirmed live that produced total silence, not just louder
+          audio — worse than the "too quiet" it was meant to fix. Volume is
+          plain default (1.0, native <audio> element) until a safer way to
+          boost it is confirmed working live before shipping again. */}
       <RoomAudioRenderer />
     </LiveKitRoom>
   );

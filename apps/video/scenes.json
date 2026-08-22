@@ -1,0 +1,42 @@
+[
+  {
+    "id": "title",
+    "type": "Title",
+    "narration": "Welcome to Python Programming, at Jua Institute. If you've never written a line of code before, this is exactly the right place to start."
+  },
+  {
+    "id": "roadmap",
+    "type": "Roadmap",
+    "narration": "This program runs thirteen weeks. Twelve real, working weeks, each built around one skill you'll actually use, followed by a final project, where you design and build a complete application on your own."
+  },
+  {
+    "id": "skills",
+    "type": "SkillProgression",
+    "narration": "You'll start with the true basics. Variables, and how a program actually runs. Then control flow, teaching a program to make real decisions. Real data structures. Functions. And by the second half, object oriented programming, working with real files and real data from the internet, and the advanced patterns that separate someone who can write Python, from someone who writes it fluently."
+  },
+  {
+    "id": "live",
+    "type": "LiveSession",
+    "narration": "Twice a week, you'll have a live, forty five minute session with your tutor. These aren't lectures. You'll write real code together, live, with your tutor watching your screen and helping in real time."
+  },
+  {
+    "id": "practice",
+    "type": "Practice",
+    "narration": "Every week ends with real, hands on practice. Writing actual code in a real editor, checked automatically, with honest feedback on what's working, and what to fix."
+  },
+  {
+    "id": "whypython",
+    "type": "Stat",
+    "narration": "Python is the most in demand programming language in the world right now. The language behind the AI boom, real data science, and a huge share of the software running today. It's also the single most recommended first language for beginners, because it reads almost like plain English."
+  },
+  {
+    "id": "noinstall",
+    "type": "NoInstall",
+    "narration": "You won't need to install anything. Every exercise in this program runs right here, in your browser. Real Python, executing for real, with real output."
+  },
+  {
+    "id": "closing",
+    "type": "Closing",
+    "narration": "Thirteen weeks from now, you won't just know Python. You'll have built real, working programs, on your own. Let's start."
+  }
+]

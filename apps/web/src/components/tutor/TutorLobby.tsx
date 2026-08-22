@@ -9,32 +9,45 @@ import { OtpVerifyForm } from '@/components/auth/OtpVerifyForm';
 import { createBrowserSupabaseClient } from '@/lib/supabase/client';
 import type { Learner } from '@/lib/learner';
 
-type Status = 'idle' | 'checking' | 'not_found' | 'not_verified' | 'not_enrolled' | 'ready' | 'in-session';
+type Status =
+  | 'idle'
+  | 'checking'
+  | 'not_found'
+  | 'not_verified'
+  | 'not_enrolled'
+  | 'no_class_scheduled'
+  | 'too_early'
+  | 'ready'
+  | 'in-session';
 
-interface Program {
-  courseId: string;
-  title: string;
+const CAT_OFFSET_HOURS = 2;
+
+function formatCat(iso: string): string {
+  const d = new Date(new Date(iso).getTime() + CAT_OFFSET_HOURS * 60 * 60 * 1000);
+  return d.toISOString().replace('T', ' ').slice(0, 16) + ' CAT';
 }
 
 // The live-class entry ritual — deliberately independent of the browser's
 // auth session. A learner types their first name and email every time; the
 // tutor is resolved from that against platform_users (verified at
 // enrollment, once — see EnrollmentForm / lib/auth/provision.ts), not from
-// a signed-in cookie. If the email isn't recognized, isn't verified yet, or
-// isn't enrolled in anything, this stops here with a clear next step —
-// nothing ever reaches the room or the agent for someone who hasn't
-// enrolled. "Not verified yet" sends a code right here (OtpVerifyForm)
-// rather than sending them off to click an email link. A learner enrolled
-// in more than one program picks which one this class is for — without
-// that, the tutor could only guess from whichever program was touched most
-// recently, which is exactly wrong the moment someone is juggling two.
+// a signed-in cookie. If the email isn't recognized, isn't verified yet,
+// isn't enrolled, or has no scheduled class assigned right now, this stops
+// here with a clear next step.
+//
+// Classes are scheduled cohort sessions, not "join anytime" — an admin
+// assigns each learner to a class_sessions row (see /admin/classes), and
+// this only offers a "Join class" button once that class is actually
+// joinable (see JOIN_WINDOW_BEFORE_MINUTES in /api/learner-status). "Not
+// verified yet" sends a code right here (OtpVerifyForm) rather than
+// sending them off to click an email link.
 export function TutorLobby() {
   const [status, setStatus] = useState<Status>('idle');
   const [firstName, setFirstName] = useState('');
   const [email, setEmail] = useState('');
   const [resolvedFirstName, setResolvedFirstName] = useState('');
-  const [programs, setPrograms] = useState<Program[]>([]);
-  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
+  const [courseTitle, setCourseTitle] = useState('');
+  const [scheduledStart, setScheduledStart] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [codeSent, setCodeSent] = useState(false);
 
@@ -46,11 +59,12 @@ export function TutorLobby() {
     });
     const data = await res.json();
     setStatus(data.status);
-    if (data.status === 'ready') {
+    if (data.status === 'ready' || data.status === 'too_early') {
       setResolvedFirstName(data.firstName || firstName);
-      const progs: Program[] = data.programs ?? [];
-      setPrograms(progs);
-      setSelectedCourseId(progs.length === 1 ? progs[0].courseId : null);
+      setCourseTitle(data.courseTitle ?? '');
+      setScheduledStart(data.scheduledStart ?? '');
+    } else if (data.status === 'no_class_scheduled') {
+      setResolvedFirstName(data.firstName || firstName);
     }
     return data.status as Status;
   }
@@ -78,13 +92,7 @@ export function TutorLobby() {
 
   if (status === 'in-session') {
     const learner: Learner = { id: '', firstName: resolvedFirstName || firstName, lastName: '', email };
-    return (
-      <TutorSessionRoom
-        learner={learner}
-        courseId={selectedCourseId ?? undefined}
-        onLeave={() => setStatus('ready')}
-      />
-    );
+    return <TutorSessionRoom learner={learner} onLeave={() => setStatus('ready')} />;
   }
 
   return (
@@ -171,29 +179,28 @@ export function TutorLobby() {
           />
         )}
 
-        {status === 'ready' && programs.length > 1 && !selectedCourseId && (
-          <div className="mt-8 flex w-full flex-col items-center gap-4 rounded-2xl border border-border bg-card px-6 py-10 text-center shadow-sm sm:px-8">
-            <p className="font-serif text-xl font-semibold text-ink">Which class, {resolvedFirstName}?</p>
-            <p className="text-sm text-ink/60">You're enrolled in more than one program — pick which one this class is for.</p>
-            <div className="mt-2 flex w-full flex-col gap-2">
-              {programs.map((p) => (
-                <button
-                  key={p.courseId}
-                  type="button"
-                  onClick={() => setSelectedCourseId(p.courseId)}
-                  className="w-full rounded border border-border bg-background px-4 py-3 text-sm font-medium text-ink hover:border-gold hover:bg-gold/10"
-                >
-                  {p.title}
-                </button>
-              ))}
-            </div>
-          </div>
+        {status === 'no_class_scheduled' && (
+          <NoticeCard
+            title={`No class scheduled yet, ${resolvedFirstName}`}
+            body="You're enrolled, but you haven't been assigned to a live class yet — check back soon, or reach out and we'll get you on the schedule."
+            onBack={() => setStatus('idle')}
+          />
         )}
 
-        {status === 'ready' && (programs.length <= 1 || selectedCourseId) && (
+        {status === 'too_early' && (
+          <NoticeCard
+            title={`Not yet, ${resolvedFirstName}`}
+            body={`Your next class — ${courseTitle} — is at ${formatCat(scheduledStart)}. Come back a few minutes before it starts.`}
+            onBack={() => setStatus('idle')}
+          />
+        )}
+
+        {status === 'ready' && (
           <div className="mt-8 flex w-full flex-col items-center gap-4 rounded-2xl border border-border bg-card px-6 py-10 text-center shadow-sm sm:px-8">
             <p className="font-serif text-xl font-semibold text-ink">Ready, {resolvedFirstName}?</p>
-            <p className="text-sm text-ink/60">Your tutor will be with you as soon as you join.</p>
+            <p className="text-sm text-ink/60">
+              {courseTitle} · {formatCat(scheduledStart)}
+            </p>
             <button
               type="button"
               onClick={() => setStatus('in-session')}

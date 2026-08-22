@@ -21,7 +21,7 @@ export function EnrollAndStartButton({
   firstLessonHref: string;
   className?: string;
 }) {
-  const { learner } = useLearnerSession();
+  const { learner, loading } = useLearnerSession();
   const [showForm, setShowForm] = useState(false);
   const [busy, setBusy] = useState(false);
   const router = useRouter();
@@ -44,8 +44,12 @@ export function EnrollAndStartButton({
   }
 
   return (
-    <button onClick={() => (learner ? enrollAndGo() : setShowForm(true))} disabled={busy} className={className}>
-      {busy ? 'Enrolling…' : 'Start the program'}
+    <button
+      onClick={() => (learner ? enrollAndGo() : setShowForm(true))}
+      disabled={busy || loading}
+      className={className}
+    >
+      {busy ? 'Enrolling…' : loading ? 'Loading…' : 'Start the program'}
     </button>
   );
 }

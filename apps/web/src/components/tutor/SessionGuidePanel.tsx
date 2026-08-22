@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { useDataChannel } from '@livekit/components-react';
-import { YouTubeEmbed } from '@/components/programs/YouTubeEmbed';
+import { LessonVideo } from '@/components/programs/LessonVideo';
 
 interface Guide {
   courseTitle: string | null;
@@ -105,12 +105,12 @@ export function SessionGuidePanel({
                 <p className="mb-2 text-sm font-medium text-ink">
                   {videoAnnounced ? '🎥 Your tutor just shared this video' : 'Prepared video for this lesson'}
                 </p>
-                <YouTubeEmbed url={guide.videoUrl} />
+                <LessonVideo url={guide.videoUrl} />
               </div>
             )}
 
             {guide.nodeContent && (
-              <article className="mt-4 space-y-3 text-sm leading-relaxed text-ink [&_code]:rounded [&_code]:bg-background [&_code]:px-1 [&_code]:py-0.5 [&_h1]:font-serif [&_h1]:text-lg [&_h1]:font-semibold [&_h2]:font-serif [&_h2]:mt-4 [&_h2]:text-base [&_h2]:font-semibold [&_pre]:overflow-x-auto [&_pre]:rounded [&_pre]:bg-ink [&_pre]:p-3 [&_pre]:text-background">
+              <article className="mt-4 space-y-3 text-sm leading-relaxed text-ink [&_code]:rounded [&_code]:bg-background [&_code]:px-1 [&_code]:py-0.5 [&_h1]:font-serif [&_h1]:text-lg [&_h1]:font-semibold [&_h2]:font-serif [&_h2]:mt-4 [&_h2]:text-base [&_h2]:font-semibold [&_pre]:overflow-x-auto [&_pre]:rounded [&_pre]:bg-ink [&_pre]:p-3 [&_pre]:text-background [&_pre_code]:bg-transparent [&_pre_code]:p-0">
                 <ReactMarkdown>{guide.nodeContent}</ReactMarkdown>
               </article>
             )}

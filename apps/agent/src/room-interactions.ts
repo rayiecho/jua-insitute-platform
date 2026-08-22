@@ -4,7 +4,7 @@ import type { voice } from '@livekit/agents';
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 
-function publishJson(room: Room, topic: string, payload: unknown) {
+export function publishJson(room: Room, topic: string, payload: unknown) {
   if (!room.localParticipant) return;
   void room.localParticipant.publishData(textEncoder.encode(JSON.stringify(payload)), { reliable: true, topic });
 }

@@ -32,6 +32,60 @@ body {
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
 
+/* Every clickable control site-wide gets real, unmistakable hover + press
+   feedback — confirmed live 2026-08-20 twice that buttons/tabs still read as
+   static printed text. A verified deploy showed the first pass
+   (scale(.97) on :active only) really was live in production CSS, so the
+   fix wasn't "it's not applied", it's "too subtle to register" — a 3% nudge
+   that only exists for the literal duration of the mouse being held down is
+   easy to miss entirely. This is deliberately global rather than
+   per-component: there's no shared Button component, every CTA is a raw
+   <button>/<Link> with its own inline classes, so dozens of files would
+   need editing and some would inevitably get missed.
+   touch-action: manipulation removes the ~300ms tap delay on touch devices,
+   and -webkit-tap-highlight-color replaces Safari's default gray flash with
+   a highlight that actually matches the brand instead of being suppressed
+   entirely (which is what a lot of sites do, and why taps can feel dead). */
+button,
+a {
+  transition:
+    transform 90ms ease-out,
+    filter 120ms ease-out,
+    background-color 120ms ease-out,
+    box-shadow 120ms ease-out;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(200, 134, 43, 0.25);
+}
+button:not(:disabled):hover,
+a:hover {
+  filter: brightness(0.94);
+}
+button:not(:disabled):active,
+a:active {
+  transform: scale(0.94);
+  filter: brightness(0.88);
+  transition-duration: 40ms;
+}
+button:disabled {
+  cursor: not-allowed;
+}
+button:not(:disabled) {
+  cursor: pointer;
+}
+
+/* Lesson content — a real, if subtle, entrance instead of the page just
+   appearing all at once, part of addressing "pages feel static." */
+@keyframes lesson-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* Live-class reactions (TutorSessionUI) — rises and fades over ~2s. */
 @keyframes float-up {
   0% {

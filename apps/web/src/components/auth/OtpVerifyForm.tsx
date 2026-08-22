@@ -16,6 +16,10 @@ export function OtpVerifyForm({
   onVerified,
 }: {
   email: string;
+  // '' when the server has no specific destination in mind (not mid an
+  // enrollment application) — callers decide their own fallback (e.g. a
+  // `next` cookie, or '/dashboard') rather than this component picking one
+  // that might override what the caller actually wants.
   onVerified: (redirectTo: string) => void;
 }) {
   const [code, setCode] = useState('');
@@ -36,7 +40,7 @@ export function OtpVerifyForm({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Verification failed');
 
-      onVerified(data.redirectTo || '/dashboard');
+      onVerified(data.redirectTo ?? '');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'That code is invalid or expired — try resending.');
     } finally {

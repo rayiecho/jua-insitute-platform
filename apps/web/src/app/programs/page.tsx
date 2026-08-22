@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { ProgramsBrowser } from '@/components/programs/ProgramsBrowser';
 
@@ -6,6 +7,15 @@ export const dynamic = 'force-dynamic';
 
 export default async function ProgramsPage() {
   const supabase = createAdminClient();
+
+  const authClient = await createServerSupabaseClient();
+  const {
+    data: { user },
+  } = await authClient.auth.getUser();
+  const { data: enrollments } = user
+    ? await supabase.from('enrollments').select('course_id').eq('user_id', user.id)
+    : { data: [] as { course_id: string }[] };
+  const enrolledCourseIds = (enrollments ?? []).map((e) => e.course_id);
 
   const { data: courses } = await supabase
     .from('courses')
@@ -40,7 +50,7 @@ export default async function ProgramsPage() {
   return (
     <>
       <SiteHeader />
-      <ProgramsBrowser programs={programs} />
+      <ProgramsBrowser programs={programs} enrolledCourseIds={enrolledCourseIds} />
     </>
   );
 }

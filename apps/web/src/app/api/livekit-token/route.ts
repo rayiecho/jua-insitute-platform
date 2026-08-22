@@ -4,7 +4,13 @@ import { createAdminClient } from '@/lib/supabase/admin';
 
 const AGENT_NAME = 'ai-tutor'; // must match ServerOptions.agentName in apps/agent/src/index.ts
 
-// Mints a room-join token for the live tutoring session. Deliberately
+// Mirrors the window in apps/web/src/app/api/learner-status/route.ts — a
+// learner can only actually mint a token while their assigned class is
+// joinable, not "whenever." Kept in sync deliberately rather than shared,
+// since these are two small, independent route files.
+const JOIN_WINDOW_BEFORE_MINUTES = 10;
+
+// Mints a room-join token for a scheduled cohort class. Deliberately
 // session-independent — live classes don't use the browser's auth cookie at
 // all, by design (see TutorLobby): the learner types their first name and
 // email every time, and identity is resolved from that against
@@ -13,10 +19,12 @@ const AGENT_NAME = 'ai-tutor'; // must match ServerOptions.agentName in apps/age
 // once, at application time (lib/auth/provision.ts) — this just doesn't
 // require the *browser* to still be carrying that session later.
 //
-// courseId is optional and only meaningful for a learner enrolled in more
-// than one program — TutorLobby's program picker sends it so the tutor
-// coaches on the program the learner actually means, instead of guessing
-// from whichever they touched most recently (see resolveActiveNode).
+// The room itself is now derived from whichever class_session the learner
+// is assigned to and currently joinable for (see the resolution below), not
+// a persistent one-per-learner room — several learners assigned to the same
+// class_sessions row land in the same room. courseId is a client-supplied
+// hint only used as a fallback if the learner somehow isn't resolvable to a
+// joinable class; the real source of truth is joinable.course_id.
 export async function POST(request: Request) {
   const { firstName, email, courseId } = (await request.json()) as {
     firstName?: string;
@@ -42,13 +50,46 @@ export async function POST(request: Request) {
   if (!enrollments || enrollments.length === 0) {
     return NextResponse.json({ error: 'not_enrolled' }, { status: 403 });
   }
-  // A client-supplied courseId that this learner isn't actually enrolled in
-  // would let them impersonate progress in a program they never joined —
-  // only honor it if it's really one of theirs, silently ignore otherwise.
-  const validCourseId = courseId && enrollments.some((e) => e.course_id === courseId) ? courseId : undefined;
+
+  // Scheduled cohort classes: a learner can only join whichever
+  // class_session they've been assigned to, within a window around its
+  // start time — mirrors the resolution in
+  // apps/web/src/app/api/learner-status/route.ts, which is what TutorLobby
+  // calls first to decide whether to show a join button at all. This is a
+  // second, server-side check against the same rule (never trust the
+  // client's "it's time" claim for something that mints a real room token).
+  const now = new Date();
+  const { data: assignments } = await admin
+    .from('class_session_enrollments')
+    .select('class_session:class_sessions(id, course_id, scheduled_start, duration_minutes, status)')
+    .eq('user_id', learner.id);
+
+  const joinable = (assignments ?? [])
+    .map((a) => (Array.isArray(a.class_session) ? a.class_session[0] : a.class_session))
+    .filter((s): s is NonNullable<typeof s> => !!s && s.status === 'scheduled')
+    .find((s) => {
+      const start = new Date(s.scheduled_start);
+      const joinFrom = new Date(start.getTime() - JOIN_WINDOW_BEFORE_MINUTES * 60 * 1000);
+      const joinUntil = new Date(start.getTime() + s.duration_minutes * 60 * 1000);
+      return now >= joinFrom && now <= joinUntil;
+    });
+
+  if (!joinable) {
+    return NextResponse.json({ error: 'no_class_ready' }, { status: 403 });
+  }
+
+  const classSessionId = joinable.id;
+  const validCourseId = courseId ?? joinable.course_id;
 
   const identity = learner.id;
-  const room = `learner-${identity}`;
+  const room = `class-${classSessionId}`;
+
+  await admin
+    .from('class_session_enrollments')
+    .update({ joined_at: new Date().toISOString() })
+    .eq('class_session_id', classSessionId)
+    .eq('user_id', learner.id)
+    .is('joined_at', null);
 
   const apiKey = process.env.LIVEKIT_API_KEY;
   const apiSecret = process.env.LIVEKIT_API_SECRET;
@@ -60,22 +101,28 @@ export async function POST(request: Request) {
 
   const roomServiceClient = new RoomServiceClient(serverUrl, apiKey, apiSecret);
 
-  // The avatar vendor (Simli) is only affordable at up to 2 concurrent
-  // sessions on the current plan — every live class room gets a real,
-  // billed avatar session, so this has to be a hard cap checked live
-  // against LiveKit, not a soft admin-side estimate. Rejoining a room this
-  // same learner is already in (a refresh, say) never counts against the
-  // cap — only genuinely other concurrent classes do.
-  const MAX_CONCURRENT_CLASSES = 2;
+  // Was capped at 2 for Simli's per-minute avatar cost — stale now that
+  // Simli is disabled entirely (2026-08-22 infra review). The real
+  // constraint today is LiveKit Cloud's free Build tier, which hard-caps at
+  // 5 concurrent agent sessions platform-wide (verified against LiveKit's
+  // docs) — Groq's Developer tier headroom comfortably covers 5 concurrent
+  // classes' worth of token throughput, so LiveKit's cap is the binding one.
+  // Rejoining a room this same learner is already in (a refresh, say) never
+  // counts against the cap — only genuinely other concurrent classes do.
+  const MAX_CONCURRENT_CLASSES = 5;
   const existingRooms = await roomServiceClient.listRooms();
   const otherActiveClasses = existingRooms.filter(
-    (r) => r.name.startsWith('learner-') && r.name !== room && r.numParticipants > 0,
+    (r) => r.name.startsWith('class-') && r.name !== room && r.numParticipants > 0,
   );
   if (otherActiveClasses.length >= MAX_CONCURRENT_CLASSES) {
     return NextResponse.json({ error: 'class_capacity_full' }, { status: 429 });
   }
 
-  const token = new AccessToken(apiKey, apiSecret, { identity, ttl: '15m' });
+  // name is required for classmates to see each other's actual names in a
+  // group class — the token previously only carried identity (a raw
+  // platform_users id), so a second learner's corner tile had nothing
+  // readable to show.
+  const token = new AccessToken(apiKey, apiSecret, { identity, name: learner.first_name, ttl: '15m' });
   token.addGrant({ room, roomJoin: true, canPublish: true, canSubscribe: true });
 
   // listDispatch 404s if the room doesn't exist yet (rooms are otherwise only
@@ -86,10 +133,11 @@ export async function POST(request: Request) {
   const dispatchClient = new AgentDispatchClient(serverUrl, apiKey, apiSecret);
   const existingDispatches = await dispatchClient.listDispatch(room);
   if (!existingDispatches.some((d) => d.agentName === AGENT_NAME)) {
-    // JSON-encoded so the agent (apps/agent/src/index.ts) can pull both the
-    // learner id and, when given, which program this class is for.
+    // JSON-encoded so the agent (apps/agent/src/index.ts) knows this is a
+    // scheduled cohort class and fetches everyone assigned to it, rather
+    // than the old single learnerId shape.
     await dispatchClient.createDispatch(room, AGENT_NAME, {
-      metadata: JSON.stringify({ learnerId: identity, courseId: validCourseId ?? null }),
+      metadata: JSON.stringify({ classSessionId }),
     });
   }
 
@@ -134,12 +182,10 @@ async function ensureSessionCurriculumContext(room: string, userId: string, cour
   }
   if (!session) return;
 
-  // Room is one-per-learner and persistent (see apps/web/src/app/tutor/page.tsx),
-  // so a session/user pair repeats on every visit — we deliberately insert a
-  // fresh row each join rather than dedupe, so continuity reflects wherever
-  // the learner actually is *now*, not wherever they were on their first-ever
-  // tutor visit. continuity.ts already reads the most recent row by
-  // created_at, so older rows are just harmless history.
+  // A class_sessions room is one-off, not persistent, but several learners
+  // can share it — this still inserts one context row per (session, user)
+  // pair so each learner's own active lesson/assignment is tracked
+  // separately even though they're all in the same room.
   const active = await resolveActiveNode(supabase, userId, courseId);
   if (!active) return; // not enrolled in a program yet — nothing to link
 

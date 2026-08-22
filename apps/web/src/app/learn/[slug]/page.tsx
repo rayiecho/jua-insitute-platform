@@ -6,10 +6,43 @@ import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { AssignmentPanel } from '@/components/tutor/AssignmentPanel';
 import { LessonHelpChat } from '@/components/tutor/LessonHelpChat';
 import { SiteHeader } from '@/components/layout/SiteHeader';
-import { YouTubeEmbed } from '@/components/programs/YouTubeEmbed';
+import { LessonVideo } from '@/components/programs/LessonVideo';
 import { LessonViewTracker } from '@/components/programs/LessonViewTracker';
 import { QuizLesson } from '@/components/programs/QuizLesson';
 import { MarkCompleteButton } from '@/components/programs/MarkCompleteButton';
+import { InlineCodeRun } from '@/components/programs/InlineCodeRun';
+import { parseCanvasFields } from '@/lib/canvasFields';
+import type { Components } from 'react-markdown';
+import type { ReactElement, ReactNode } from 'react';
+
+// Fenced ```python-run blocks in lesson markdown render as a real, editable,
+// runnable snippet (InlineCodeRun) instead of a static code block — "try it
+// yourself" right where a concept is introduced, not just at the week's
+// graded exercise. Any other fence (```python, ```bash, ...) still renders
+// as plain static code exactly as before. `pre` is overridden too, not just
+// `code` — react-markdown always wraps a fenced block's code in <pre>, and
+// InlineCodeRun renders its own <div>-based layout (buttons, textarea,
+// output panel), which is invalid nested inside a <pre> and would also
+// inherit the article's dark <pre> styling meant for real static code.
+function isPythonRunCode(node: ReactNode): node is ReactElement<{ className?: string; children?: ReactNode }> {
+  return (
+    typeof node === 'object' &&
+    node !== null &&
+    'props' in node &&
+    typeof (node as ReactElement<{ className?: string }>).props?.className === 'string' &&
+    (node as ReactElement<{ className?: string }>).props.className!.includes('language-python-run')
+  );
+}
+
+const markdownComponents: Components = {
+  pre({ children }) {
+    const child = Array.isArray(children) ? children[0] : children;
+    if (isPythonRunCode(child)) {
+      return <InlineCodeRun initialCode={String(child.props.children)} />;
+    }
+    return <pre>{children}</pre>;
+  },
+};
 
 const LESSON_TYPE_LABEL: Record<string, string> = {
   video: 'Video',
@@ -96,6 +129,23 @@ export default async function LessonPage({ params }: { params: Promise<{ slug: s
             {currentWeek.is_final_assessment ? 'Final' : `Week ${currentWeek.week_number}`}
           </p>
           <p className="mt-1 font-serif text-base font-semibold text-ink">{currentWeek.title}</p>
+          {(() => {
+            const doneInWeek = weekNodes.filter((n) => completedIds.has(n.id)).length;
+            const pct = weekNodes.length > 0 ? Math.round((doneInWeek / weekNodes.length) * 100) : 0;
+            return (
+              <div className="mt-3">
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-border">
+                  <div
+                    className="h-full rounded-full bg-gold transition-[width] duration-500 ease-out"
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+                <p className="mt-1 text-xs text-ink/40">
+                  {doneInWeek}/{weekNodes.length} lessons this week
+                </p>
+              </div>
+            );
+          })()}
           <nav className="mt-4 flex flex-col gap-1">
             {weekNodes.map((n) => {
               const isCurrent = n.id === node.id;
@@ -198,19 +248,22 @@ export default async function LessonPage({ params }: { params: Promise<{ slug: s
   const typeLabel = LESSON_TYPE_LABEL[node.lesson_type] ?? null;
 
   const article = (
-    <article className="max-w-3xl space-y-4 leading-relaxed text-ink [&_code]:rounded [&_code]:bg-card [&_code]:px-1 [&_code]:py-0.5 [&_h1]:font-serif [&_h1]:text-2xl [&_h1]:font-semibold [&_h2]:font-serif [&_h2]:mt-6 [&_h2]:text-xl [&_h2]:font-semibold [&_pre]:overflow-x-auto [&_pre]:rounded [&_pre]:bg-ink [&_pre]:p-4 [&_pre]:text-background">
+    <article
+      style={{ animation: 'lesson-fade-in 0.4s ease-out' }}
+      className="max-w-3xl space-y-4 leading-relaxed text-ink [&_a]:font-medium [&_a]:text-tan [&_a]:underline [&_a]:underline-offset-2 [&_a:hover]:text-ink [&_code]:rounded [&_code]:bg-card [&_code]:px-1 [&_code]:py-0.5 [&_h1]:font-serif [&_h1]:text-2xl [&_h1]:font-semibold [&_h2]:font-serif [&_h2]:mt-6 [&_h2]:text-xl [&_h2]:font-semibold [&_pre]:overflow-x-auto [&_pre]:rounded [&_pre]:bg-ink [&_pre]:p-4 [&_pre]:text-background [&_pre_code]:bg-transparent [&_pre_code]:p-0"
+    >
       {typeLabel && (
         <span className="inline-block rounded-full bg-gold/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-gold-dark">
           {typeLabel}
         </span>
       )}
-      {node.video_url && <YouTubeEmbed url={node.video_url} />}
-      <ReactMarkdown>{node.markdown_content}</ReactMarkdown>
+      {node.video_url && <LessonVideo url={node.video_url} />}
+      <ReactMarkdown components={markdownComponents}>{node.markdown_content}</ReactMarkdown>
       {assignment && (
         <>
           <hr className="border-border" />
           <h2 className="font-serif text-xl font-semibold">{assignment.title}</h2>
-          <ReactMarkdown>{assignment.instructions_markdown}</ReactMarkdown>
+          <ReactMarkdown>{parseCanvasFields(assignment.instructions_markdown)?.cleanedInstructions ?? assignment.instructions_markdown}</ReactMarkdown>
         </>
       )}
       {/* Assignment-backed lessons complete via grading (see /api/grade), not

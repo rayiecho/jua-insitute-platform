@@ -4,6 +4,12 @@ export interface OpeningContext {
   systemPrompt: string;
   openingLine: string;
   preparedVideo: { title: string; url: string } | null;
+  // Lets index.ts decide which teaching-screen tools to even offer the
+  // model — confirmed live 2026-08-19: with showCode available in every
+  // course, the tutor wrote a Python pandas demo mid-Entrepreneurship-class
+  // as an "illustration." Restricting the tool to programming courses is
+  // more reliable than trusting the prompt alone to talk it out of that.
+  courseTitle: string | null;
 }
 
 // Section 4.4 — "Pick up where we left off". Runs once at session start,
@@ -13,7 +19,7 @@ export async function buildOpeningContext(learnerId: string, courseId?: string):
   const memories = await fetchRecentSessionSummaries(learnerId);
 
   const parts: string[] = [
-    'You are a 1-on-1 AI tutor picking up an ongoing relationship with this learner.',
+    'Your name is Jua. You are a 1-on-1 AI tutor at Jua Institute, picking up an ongoing relationship with this learner. If asked what model, AI, or company you\'re built on, say you\'re Jua Institute\'s own tutor — never mention ChatGPT, OpenAI, GPT, Groq, Deepgram, or any other underlying vendor or model name, even if asked directly.',
   ];
   if (curriculumContext?.courseTitle) {
     parts.push(
@@ -29,9 +35,7 @@ export async function buildOpeningContext(learnerId: string, courseId?: string):
         `This week's self-paced portal lessons cover: ${curriculumContext.weekLessonTitles.join('; ')}. Don't just recite these — your job in this live session is to teach the underlying CONCEPTS behind the week through discussion, at a level that makes sense given where the learner actually is, not to read the portal content aloud.`,
       );
     }
-    parts.push(
-      'Be interactive: ask the learner questions throughout to check understanding, invite them to explain ideas back in their own words, and adjust pace based on how they respond. Avoid long uninterrupted monologues.',
-    );
+    parts.push(ENGAGEMENT_INSTRUCTIONS);
   }
   if (curriculumContext?.nodeContent) {
     parts.push(
@@ -60,6 +64,9 @@ export async function buildOpeningContext(learnerId: string, courseId?: string):
       `What actually happened in your last live sessions with this learner, most recent first:\n${memories.map((m) => `- ${m}`).join('\n')}\n\nOpen by referencing something SPECIFIC from this — not a generic "welcome back" — so the learner can tell you genuinely remember the conversation, not just their curriculum position.`,
     );
   }
+  parts.push(TEACHING_SCREEN_INSTRUCTIONS);
+  parts.push(UNDERSTANDING_INSTRUCTIONS);
+
   parts.push(
     curriculumContext?.nodeTitle
       ? 'Open the session by briefly acknowledging where the learner left off — do not greet them as a stranger.'
@@ -75,8 +82,34 @@ export async function buildOpeningContext(learnerId: string, courseId?: string):
       curriculumContext?.videoUrl && curriculumContext.nodeTitle
         ? { title: curriculumContext.nodeTitle, url: curriculumContext.videoUrl }
         : null,
+    courseTitle: curriculumContext?.courseTitle ?? null,
   };
 }
+
+// Shared by both the 1-on-1 and group opening contexts — the teaching
+// screen (apps/agent/src/teaching-screen.ts) is available in every live
+// class regardless of format.
+const TEACHING_SCREEN_INSTRUCTIONS =
+  'You have a shared teaching screen visible to the learner(s), like screen-sharing in a live call. When walking through Python code, call showCode with the real code (set run:true to actually execute it and show real output, like live coding in VS Code) instead of just describing it verbally. When introducing or summarizing a non-code concept, call showSlide with a short title and a few concrete points, like presenting a slide. ' +
+  'Call at most ONE of these per spoken turn, and only when you are genuinely moving to a new topic — never call it more than once in a row before actually speaking, and never call it again seconds later. ' +
+  'The screen is a visual aid, not your script: never say out loud that you are "showing a slide" or announce the tool itself, and never just read the slide\'s points aloud verbatim — talk through the idea in your own words, with more depth, examples, and back-and-forth than the few short points on screen, the way a real teacher elaborates on a slide instead of reciting it.';
+
+// Confirmed live 2026-08-19: the tutor was talking for long uninterrupted
+// stretches and the learner's attention drifted — the previous one-line
+// "be interactive" instruction wasn't concrete enough to actually change
+// behavior. This gives it a hard cadence to follow instead of a vague ideal.
+const ENGAGEMENT_INSTRUCTIONS =
+  'Never speak for more than about 30-45 seconds (roughly 2-3 short spoken paragraphs) without stopping to involve the learner — ask a direct question, have them predict what happens next, or have them explain something back in their own words, then wait for a real answer before continuing. Do not lecture in one long monologue and check in only at the end; check in constantly, mid-explanation. If the learner gives a short or passive reply ("ok", "yeah"), follow up with something that requires them to actually think and respond, not just acknowledge.';
+
+const GROUP_ENGAGEMENT_INSTRUCTIONS =
+  'Never speak for more than about 30-45 seconds without stopping to involve the group — ask a direct question and call on a specific learner by name to answer, or have someone explain an idea back in their own words, then wait for a real answer before continuing. Rotate who you call on so it is not always the same person. Do not lecture in one long monologue and check in only at the end; check in constantly, mid-explanation.';
+
+// "Make it have sense, not generic — some real understanding." A canned
+// definition-then-example script reads as generic regardless of how the
+// content is delivered; this asks for actual pedagogical judgment based on
+// what the learner specifically says, not a fixed lesson script.
+const UNDERSTANDING_INSTRUCTIONS =
+  "Actually diagnose what the learner understands rather than running through a fixed script. When they answer or ask something, respond to the SPECIFIC thing they said — reference their actual words or idea directly, don't give a generic restatement of the concept as if they hadn't spoken. If their answer reveals a specific misconception, name that exact misconception and correct it directly, rather than just repeating the definition from the top. If they clearly already understand something, don't re-explain it — move forward. Prefer explaining WHY something works the way it does, with a concrete real-world example (a real small business scenario, a real piece of code's actual behavior), over reciting a dictionary-style definition. Treat this as a real, ongoing teaching relationship with this specific person, not a generic lesson being read to whoever happens to be listening.";
 
 interface CurrentCurriculumContext {
   courseTitle: string | null;
@@ -221,6 +254,127 @@ async function fetchCurrentCurriculumContext(
     assignmentTitle,
     assignmentInstructions,
   };
+}
+
+// Scheduled cohort classes: several learners share one class_sessions row
+// and one LiveKit room (`class-${classSessionId}`, minted by
+// apps/web/src/app/api/livekit-token/route.ts). Unlike the old
+// one-room-per-learner model, curriculum context here comes straight from
+// the class_sessions/course_weeks row the admin scheduled — there's no
+// per-learner recency guess to make, everyone in the room is here for the
+// same week. Per-learner history (conversation_summaries) still isn't
+// meaningful across DISTINCT scheduled classes (each class_sessions row is
+// a one-off event, not a recurring room), so this only looks for summaries
+// tied to this exact room — relevant on a reconnect mid-class, not "last
+// week's class."
+export async function buildGroupOpeningContext(classSessionId: string): Promise<OpeningContext> {
+  const room = `class-${classSessionId}`;
+
+  const { data: session } = await supabase
+    .from('class_sessions')
+    .select('course_id, week_id, duration_minutes, course:courses(title)')
+    .eq('id', classSessionId)
+    .maybeSingle();
+
+  const course = session ? (Array.isArray(session.course) ? session.course[0] : session.course) : null;
+  const courseTitle = course?.title ?? null;
+
+  const { data: enrollmentRows } = await supabase
+    .from('class_session_enrollments')
+    .select('learner:platform_users(first_name, last_name)')
+    .eq('class_session_id', classSessionId);
+  const learnerNames = (enrollmentRows ?? [])
+    .map((r) => (Array.isArray(r.learner) ? r.learner[0] : r.learner))
+    .filter((l): l is { first_name: string; last_name: string } => !!l)
+    .map((l) => l.first_name);
+
+  let weekNumber: number | null = null;
+  let weekTitle: string | null = null;
+  let weekSummary: string | null = null;
+  let weekLessonTitles: string[] = [];
+
+  if (session?.week_id) {
+    const { data: week } = await supabase
+      .from('course_weeks')
+      .select('week_number, title, summary')
+      .eq('id', session.week_id)
+      .maybeSingle();
+    if (week) {
+      weekNumber = week.week_number;
+      weekTitle = week.title;
+      weekSummary = week.summary;
+    }
+    const { data: weekNodes } = await supabase
+      .from('curriculum_nodes')
+      .select('title')
+      .eq('week_id', session.week_id)
+      .order('sequence_order', { ascending: true });
+    weekLessonTitles = (weekNodes ?? []).map((n) => n.title);
+  }
+
+  const memories = await fetchRecentSessionSummariesByRoom(room);
+
+  const parts: string[] = [
+    "Your name is Jua. If asked what model, AI, or company you're built on, say you're Jua Institute's own tutor — never mention ChatGPT, OpenAI, GPT, Groq, Deepgram, or any other underlying vendor or model name, even if asked directly.",
+    learnerNames.length > 1
+      ? `You are an AI tutor teaching a live group class to ${learnerNames.length} learners: ${learnerNames.join(', ')}. Address them by name, involve everyone, and don't let the conversation become 1-on-1 with whoever is most talkative.`
+      : 'You are an AI tutor teaching a live class.',
+  ];
+  if (courseTitle) {
+    parts.push(`This class is for the "${courseTitle}" program. Coach on this program only.`);
+  }
+  if (weekTitle) {
+    parts.push(
+      `This session covers Week ${weekNumber}: "${weekTitle}" (roughly a ${session?.duration_minutes ?? 45}-minute session).\n\nWeek summary: ${weekSummary ?? ''}`,
+    );
+    if (weekLessonTitles.length > 0) {
+      parts.push(
+        `This week's self-paced portal lessons cover: ${weekLessonTitles.join('; ')}. Teach the underlying CONCEPTS behind the week through discussion, at a level that works for the whole group, not a read-aloud of the portal content.`,
+      );
+    }
+    parts.push(GROUP_ENGAGEMENT_INSTRUCTIONS);
+  }
+  if (memories.length > 0) {
+    parts.push(
+      `Earlier in this same class session, before a reconnect:\n${memories.map((m) => `- ${m}`).join('\n')}\n\nPick back up from there rather than restarting.`,
+    );
+  }
+  parts.push(TEACHING_SCREEN_INSTRUCTIONS);
+  parts.push(UNDERSTANDING_INSTRUCTIONS);
+
+  parts.push(
+    weekTitle
+      ? `Open the session by welcoming everyone by name and briefly framing Week ${weekNumber}: "${weekTitle}".`
+      : 'Open the session by welcoming everyone by name and asking what they would like to focus on.',
+  );
+
+  return {
+    systemPrompt: parts.join('\n\n'),
+    openingLine: weekTitle
+      ? `Welcome the group by name and introduce Week ${weekNumber}: "${weekTitle}".`
+      : 'Welcome the group by name and ask what they would like to focus on first.',
+    preparedVideo: null,
+    courseTitle,
+  };
+}
+
+async function fetchRecentSessionSummariesByRoom(room: string): Promise<string[]> {
+  const { data: sessionRow } = await supabase
+    .from('classroom_sessions')
+    .select('id')
+    .eq('room_name', room)
+    .maybeSingle();
+
+  if (!sessionRow) return [];
+
+  const { data } = await supabase
+    .from('conversation_summaries')
+    .select('summary_text')
+    .eq('session_id', sessionRow.id)
+    .order('created_at', { ascending: false })
+    .limit(5);
+
+  return (data ?? []).map((row) => row.summary_text);
 }
 
 // Real cross-session memory, without the disabled embedding pipeline.

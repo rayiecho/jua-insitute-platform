@@ -1,0 +1,19 @@
+{
+  "name": "@ai-tutor/video",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "synthesize": "node scripts/synthesize.mjs",
+    "render": "node scripts/render.mjs",
+    "upload": "node scripts/upload.mjs"
+  },
+  "dependencies": {
+    "@remotion/bundler": "^4.0.515",
+    "@remotion/google-fonts": "^4.0.515",
+    "@remotion/renderer": "^4.0.515",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "remotion": "^4.0.515"
+  }
+}

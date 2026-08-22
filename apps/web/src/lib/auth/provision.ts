@@ -16,12 +16,19 @@ import type { SupabaseClient, User } from '@supabase/supabase-js';
 //    a staged intent until the email is proven real.
 //
 // Returns where the browser should land: the first lesson of the
-// just-enrolled program, or the dashboard for a returning/already-enrolled
-// learner.
+// just-enrolled program if this verification consumed a pending
+// application, or null otherwise — null deliberately, not a hardcoded
+// '/dashboard' default, so callers with their own destination in mind (e.g.
+// admin sign-in returning to /admin, or a live-class join flow) aren't
+// silently overridden by a generic fallback that has nothing to do with
+// what they actually asked for. Confirmed live 2026-08-19: admin sign-in
+// verified successfully but always landed on /dashboard instead of /admin
+// because this used to hardcode that default and every caller treated it as
+// authoritative over their own `next`.
 export async function provisionAndVerify(
   admin: SupabaseClient,
   user: User,
-): Promise<{ redirectTo: string; error?: string }> {
+): Promise<{ redirectTo: string | null; error?: string }> {
   const { data: existing } = await admin
     .from('platform_users')
     .select('id, email_verified')
@@ -78,16 +85,16 @@ export async function provisionAndVerify(
       commitment_hours: application?.commitment_hours ?? null,
       interests: application?.interests ?? null,
     });
-    if (insertError) return { redirectTo: '/dashboard', error: insertError.message };
+    if (insertError) return { redirectTo: null, error: insertError.message };
   } else if (!existing.email_verified) {
     const { error: updateError } = await admin
       .from('platform_users')
       .update({ email_verified: true })
       .eq('id', user.id);
-    if (updateError) return { redirectTo: '/dashboard', error: updateError.message };
+    if (updateError) return { redirectTo: null, error: updateError.message };
   }
 
-  let redirectTo = '/dashboard';
+  let redirectTo: string | null = null;
 
   if (application) {
     await admin.from('enrollment_applications').update({ status: 'verified' }).eq('id', application.id);

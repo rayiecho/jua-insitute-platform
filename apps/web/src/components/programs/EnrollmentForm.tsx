@@ -82,7 +82,7 @@ export function EnrollmentForm({ courseId, className }: { courseId: string; clas
   if (awaitingCode) {
     return (
       <div className={className}>
-        <OtpVerifyForm email={email} onVerified={(redirectTo) => router.push(redirectTo)} />
+        <OtpVerifyForm email={email} onVerified={(redirectTo) => router.push(redirectTo || '/dashboard')} />
       </div>
     );
   }

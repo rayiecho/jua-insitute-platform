@@ -1,26 +1,32 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { createBrowserSupabaseClient } from '@/lib/supabase/client';
+import { OtpVerifyForm } from './OtpVerifyForm';
 
 const NEXT_COOKIE = 'auth_next';
 
-// Real email verification via Supabase Auth — magic links (no new vendor
+// Real email verification via Supabase Auth — a typed code (no new vendor
 // needed, Supabase/AWS SES sends the email) or Google Sign-In, both count
-// as "verified" the same way and both get handled by middleware.ts on the
-// way back. Verification happens once, at first sign-in — after that, the
-// session cookie persists, so returning learners just land on whatever
-// page they visit already signed in, no repeat verification. 'enroll' mode
-// collects a name (first-time registration, e.g. from EnrollAndStartButton)
-// for the email path — Google supplies a name automatically. 'signin' mode
-// is email-only for returning learners joining a live class, matching
-// "they just type their email address."
+// as "verified" the same way. Email verification is code-entry only, not a
+// magic-link click (see OtpVerifyForm) — this project settled on that
+// platform-wide so nothing depends on link-click redirect quirks.
+// Verification happens once, at first sign-in — after that, the session
+// cookie persists, so returning learners just land on whatever page they
+// visit already signed in, no repeat verification. 'enroll' mode collects a
+// name (first-time registration, e.g. from EnrollAndStartButton) for the
+// email path — Google supplies a name automatically. 'signin' mode is
+// email-only for returning learners/admin, matching "they just type their
+// email address."
 //
 // `next` is stashed in a cookie rather than passed through the redirect
 // URL — confirmed live (2026-08-18) that Supabase truncates whatever
 // path/query we request down to the bare origin regardless of Redirect URL
 // config, so a query param would just get silently dropped. The cookie
-// survives the round-trip regardless of what Supabase does to the URL.
+// survives the round-trip regardless of what Supabase does to the URL —
+// still needed for the Google OAuth path (see AuthHashHandler), which does
+// redirect through Supabase.
 export function EmailAuthForm({
   mode,
   next,
@@ -30,6 +36,7 @@ export function EmailAuthForm({
   next: string;
   onSent?: () => void;
 }) {
+  const router = useRouter();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -39,9 +46,14 @@ export function EmailAuthForm({
   const [error, setError] = useState<string | null>(null);
 
   function stashNext() {
-    // Path cookie, 10 minutes — long enough to check email and click, short
-    // enough not to linger if abandoned.
+    // Path cookie, 10 minutes — long enough to check email and type the
+    // code, short enough not to linger if abandoned. Still needed for the
+    // Google OAuth path below, which redirects through Supabase.
     document.cookie = `${NEXT_COOKIE}=${encodeURIComponent(next)}; path=/; max-age=600; SameSite=Lax`;
+  }
+
+  function deleteCookie(name: string) {
+    document.cookie = `${name}=; path=/; max-age=0`;
   }
 
   async function handleGoogle() {
@@ -72,7 +84,6 @@ export function EmailAuthForm({
       const { error: sendError } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          emailRedirectTo: window.location.origin,
           data: mode === 'enroll' ? { first_name: firstName, last_name: lastName } : undefined,
         },
       });
@@ -88,12 +99,13 @@ export function EmailAuthForm({
 
   if (sent) {
     return (
-      <div className="rounded-lg border border-gold bg-gold/10 px-4 py-3">
-        <p className="text-sm font-medium text-ink">Check your email</p>
-        <p className="mt-1 text-sm text-ink/60">
-          We sent a verification link to <span className="font-medium">{email}</span>. Click it to continue.
-        </p>
-      </div>
+      <OtpVerifyForm
+        email={email}
+        onVerified={(redirectTo) => {
+          deleteCookie(NEXT_COOKIE);
+          router.replace(redirectTo || next);
+        }}
+      />
     );
   }
 

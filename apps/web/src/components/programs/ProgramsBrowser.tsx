@@ -1,6 +1,3 @@
-'use client';
-
-import { useState } from 'react';
 import Link from 'next/link';
 import { WaitlistForm } from './WaitlistForm';
 
@@ -22,111 +19,188 @@ interface Program {
   weeks: Week[];
 }
 
-export function ProgramsBrowser({ programs }: { programs: Program[] }) {
-  const [selectedId, setSelectedId] = useState(programs[0]?.id ?? null);
-  const selected = programs.find((p) => p.id === selectedId) ?? programs[0] ?? null;
-
+// A real catalog page — a grid of programs the way Canvas/any course
+// catalog presents them, not a sidebar-tab browser hiding everything but
+// one program at a time behind a click. Server-rendered (no client state of
+// its own); WaitlistForm is the only interactive island.
+export function ProgramsBrowser({
+  programs,
+  enrolledCourseIds,
+}: {
+  programs: Program[];
+  enrolledCourseIds: string[];
+}) {
   return (
-    <main className="flex w-full flex-1 flex-col gap-6 px-4 py-8 sm:px-6 md:flex-row md:gap-10 md:px-8 md:py-10">
-      <aside className="shrink-0 md:w-64">
-        <p className="px-1 text-xs font-semibold uppercase tracking-wide text-ink/50 md:px-3">Programs</p>
-        <nav className="mt-3 flex gap-2 overflow-x-auto pb-1 md:flex-col md:overflow-visible md:pb-0">
-          {programs.map((program) => {
-            const isSelected = program.id === selected?.id;
-            return (
-              <button
-                key={program.id}
-                type="button"
-                onClick={() => setSelectedId(program.id)}
-                className={`flex shrink-0 flex-col items-start rounded-lg border px-4 py-3 text-left transition-colors ${
-                  isSelected ? 'border-gold bg-gold/10' : 'border-transparent text-ink/70 hover:bg-card'
-                }`}
-              >
-                <span className={`whitespace-nowrap text-sm font-medium ${isSelected ? 'text-ink' : ''}`}>
-                  {program.title}
-                </span>
-                <span className="mt-0.5 text-xs text-ink/50">
-                  {program.status === 'live' ? 'Live now' : 'Coming soon'}
-                </span>
-              </button>
-            );
-          })}
-        </nav>
-      </aside>
+    <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-12 sm:px-6 sm:py-16 md:px-8">
+      <div className="max-w-2xl">
+        <span className="text-xs font-semibold uppercase tracking-[0.2em] text-tan">Jua Institute</span>
+        <h1 className="mt-3 font-serif text-4xl font-semibold text-ink sm:text-5xl">Programs</h1>
+        <p className="mt-4 text-lg leading-relaxed text-ink/70">
+          Real curriculum, a live AI tutor twice a week, and an always-available guide the rest of the time — pick a
+          program and start today.
+        </p>
+      </div>
 
-      {selected && (
-        <section className="min-w-0 flex-1">
-          {/* Header band — fills the space instead of a lone text stack. */}
-          <div className="rounded-2xl border border-border bg-card px-6 py-8 sm:px-10 sm:py-12">
-            <span className="text-xs font-semibold tracking-wide text-tan uppercase">
-              {selected.difficulty_level}
-            </span>
-            <h1 className="mt-2 font-serif text-3xl font-semibold text-ink sm:text-4xl">{selected.title}</h1>
-            {selected.tagline && <p className="mt-3 max-w-xl text-lg text-ink/70">{selected.tagline}</p>}
-            <p className="mt-4 max-w-2xl text-ink/70">{selected.description}</p>
-
-            <div className="mt-8">
-              {selected.status === 'live' && selected.slug ? (
-                <Link
-                  href={`/programs/${selected.slug}`}
-                  className="inline-flex items-center rounded bg-gold px-6 py-3 text-sm font-semibold text-ink"
-                >
-                  View syllabus &amp; start
-                </Link>
-              ) : (
-                <div className="max-w-sm">
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink/50">
-                    Join the waitlist — we&apos;ll email you at launch
-                  </p>
-                  <WaitlistForm courseId={selected.id} />
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Stats row */}
-          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <Stat
-              label="Duration"
-              value={
-                selected.weeks.length > 0
-                  ? `${selected.weeks.filter((w) => !w.isFinal).length} weeks + final`
-                  : '4–10 weeks'
-              }
-            />
-            <Stat label="Live classes" value="2× per week" />
-            <Stat label="Lessons" value={selected.lessonCount > 0 ? `${selected.lessonCount}` : 'In progress'} />
-          </div>
-
-          {/* Week-by-week syllabus, when the structure exists */}
-          {selected.weeks.length > 0 && (
-            <div className="mt-10">
-              <h2 className="font-serif text-xl font-semibold text-ink">Program structure</h2>
-              <ol className="mt-4 divide-y divide-border rounded-lg border border-border bg-card">
-                {selected.weeks.map((week) => (
-                  <li key={week.weekNumber} className="flex items-center gap-4 px-5 py-4">
-                    <span className="font-serif text-lg text-tan">
-                      {week.isFinal ? 'Final' : `W${week.weekNumber}`}
-                    </span>
-                    <span className="font-medium text-ink">{week.title}</span>
-                  </li>
-                ))}
-              </ol>
-            </div>
-          )}
-        </section>
+      {programs.length === 0 ? (
+        <p className="mt-12 text-ink/60">No programs published yet.</p>
+      ) : (
+        <div className="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {programs.map((program) => (
+            <ProgramCard key={program.id} program={program} enrolled={enrolledCourseIds.includes(program.id)} />
+          ))}
+        </div>
       )}
-
-      {programs.length === 0 && <p className="text-ink/60">No programs published yet.</p>}
     </main>
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function ProgramCard({ program, enrolled }: { program: Program; enrolled: boolean }) {
+  const weekCount = program.weeks.filter((w) => !w.isFinal).length;
+  const isLive = program.status === 'live';
+
   return (
-    <div className="rounded-lg border border-border bg-card px-5 py-4">
-      <p className="text-xs font-semibold uppercase tracking-wide text-ink/50">{label}</p>
-      <p className="mt-1 font-serif text-lg font-semibold text-ink">{value}</p>
+    <div className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-card transition-shadow duration-200 hover:shadow-[0_8px_30px_-12px_rgba(20,20,20,0.15)]">
+      <div className="flex items-start justify-between px-6 pt-6">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gold/15 text-gold-dark">
+          <ProgramIcon title={program.title} />
+        </div>
+        <div className="flex flex-col items-end gap-1.5">
+          {isLive ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-gold/15 px-2.5 py-1 text-[11px] font-semibold text-gold-dark">
+              <span className="h-1.5 w-1.5 rounded-full bg-gold" />
+              Live now
+            </span>
+          ) : (
+            <span className="inline-flex items-center rounded-full bg-ink/5 px-2.5 py-1 text-[11px] font-semibold text-ink/50">
+              Coming soon
+            </span>
+          )}
+          {enrolled && (
+            <span className="inline-flex items-center rounded-full border border-gold/40 px-2.5 py-1 text-[11px] font-semibold text-gold-dark">
+              Enrolled
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="flex flex-1 flex-col px-6 pb-6 pt-4">
+        <span className="text-xs font-semibold uppercase tracking-wide text-tan">{program.difficulty_level}</span>
+        <h2 className="mt-1.5 font-serif text-xl font-semibold leading-snug text-ink">{program.title}</h2>
+        <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-ink/65">
+          {program.tagline || program.description}
+        </p>
+
+        <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-ink/50">
+          <span className="flex items-center gap-1.5">
+            <CalendarIcon />
+            {weekCount > 0 ? `${weekCount} weeks + final` : '4–10 weeks'}
+          </span>
+          <span className="flex items-center gap-1.5">
+            <BookIcon />
+            {program.lessonCount > 0 ? `${program.lessonCount} lessons` : 'In progress'}
+          </span>
+          <span className="flex items-center gap-1.5">
+            <VideoIcon />
+            2×/week live
+          </span>
+        </div>
+
+        <div className="mt-6 flex-1" />
+
+        {isLive && enrolled ? (
+          <div className="flex flex-col gap-2">
+            <Link
+              href={program.slug ? `/programs/${program.slug}` : '/dashboard'}
+              className="inline-flex items-center justify-center rounded-lg bg-gold px-4 py-2.5 text-sm font-semibold text-ink transition-colors hover:bg-gold-dark"
+            >
+              Continue learning
+            </Link>
+            {/* The card's PRIMARY action is the course content (syllabus,
+                lessons, progress) — confirmed live 2026-08-20 that routing
+                straight into the live voice room from here, with no way to
+                see any course content first, was the actual complaint. Live
+                class is still one click away, just not the only option. */}
+            <Link href="/tutor" className="text-center text-xs font-medium text-tan hover:text-ink">
+              Join live class →
+            </Link>
+          </div>
+        ) : isLive && program.slug ? (
+          <Link
+            href={`/programs/${program.slug}`}
+            className="inline-flex items-center justify-center rounded-lg bg-gold px-4 py-2.5 text-sm font-semibold text-ink transition-colors hover:bg-gold-dark"
+          >
+            View syllabus &amp; start
+          </Link>
+        ) : (
+          <div>
+            <p className="mb-2 text-xs font-medium text-ink/50">We&apos;ll email you at launch</p>
+            <WaitlistForm courseId={program.id} />
+          </div>
+        )}
+      </div>
     </div>
+  );
+}
+
+// A small, deliberate icon set instead of a generic placeholder square —
+// picked by keyword since courses have no category column in the schema
+// (see apps/agent's isProgrammingCourse for the same constraint).
+function ProgramIcon({ title }: { title: string }) {
+  const t = title.toLowerCase();
+  if (/python|program|coding|software|developer/.test(t)) return <CodeIcon />;
+  if (/entrepreneur|business|startup/.test(t)) return <BriefcaseIcon />;
+  return <CapIcon />;
+}
+
+function CodeIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 8l-4 4 4 4M15 8l4 4-4 4" />
+    </svg>
+  );
+}
+
+function BriefcaseIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
+      <rect x="3" y="7" width="18" height="12" rx="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V5.5A1.5 1.5 0 0 1 9.5 4h5A1.5 1.5 0 0 1 16 5.5V7M3 12h18" />
+    </svg>
+  );
+}
+
+function CapIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M2 9l10-5 10 5-10 5-10-5Z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M6 11v5c0 1.1 2.7 3 6 3s6-1.9 6-3v-5" />
+    </svg>
+  );
+}
+
+function CalendarIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2">
+      <rect x="3" y="4.5" width="18" height="16" rx="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path strokeLinecap="round" d="M3 9.5h18M8 3v3M16 3v3" />
+    </svg>
+  );
+}
+
+function BookIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 5.5C4 4.7 4.7 4 5.5 4H12v16H5.5A1.5 1.5 0 0 1 4 18.5v-13Z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M20 5.5c0-.8-.7-1.5-1.5-1.5H12v16h6.5a1.5 1.5 0 0 0 1.5-1.5v-13Z" />
+    </svg>
+  );
+}
+
+function VideoIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2">
+      <rect x="3" y="6" width="13" height="12" rx="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M16 10.5l5-3v9l-5-3" />
+    </svg>
   );
 }

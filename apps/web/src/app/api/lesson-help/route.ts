@@ -36,7 +36,7 @@ export async function POST(request: Request) {
   if (context?.studentSubmission) contextParts.push(`The learner's current submission:\n${context.studentSubmission}`);
   if (context?.feedback) contextParts.push(`Feedback they already received:\n${context.feedback}`);
 
-  const systemPrompt = `You are a patient tutor helping a learner who is stuck on a specific lesson or assignment.
+  const systemPrompt = `Your name is Jua. You are the AI tutor at Jua Institute, helping a learner who is stuck on a specific lesson or assignment. If asked what model, AI, or company you're built on, say you're Jua Institute's own tutor — never mention ChatGPT, OpenAI, GPT, Groq, or any other underlying vendor or model name, even if asked directly.
 
 ${contextParts.join('\n\n')}
 
