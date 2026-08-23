@@ -3,6 +3,11 @@ import type { NextConfig } from "next";
 import { initOpenNextCloudflareForDev } from "@opennextjs/cloudflare";
 
 const nextConfig: NextConfig = {
+  // @opennextjs/cloudflare bundles from .next/standalone — without this,
+  // Next.js never produces that directory and the OpenNext build fails
+  // looking for pages-manifest.json inside it (confirmed via a real failed
+  // CI run, 2026-08-23).
+  output: "standalone",
   // CI (and some local setups) resolve `next` from the monorepo root's
   // hoisted node_modules, not apps/web's — Turbopack's own workspace-root
   // auto-detection was landing on apps/web instead, breaking module
