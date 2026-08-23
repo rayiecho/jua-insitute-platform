@@ -28,6 +28,16 @@ jobs:
         working-directory: .
         run: npm install
 
+      # package-lock.json was generated on Windows, so it only records the
+      # win32-x64-msvc optional native binaries for lightningcss and
+      # @tailwindcss/oxide — npm won't fetch the linux-x64-gnu variants this
+      # runner needs just from the lockfile (confirmed via a real failed CI
+      # run, 2026-08-23). Installing them explicitly here, pinned to the
+      # versions already in the lockfile, unblocks the build without
+      # regenerating the lockfile itself.
+      - name: Install Linux native binaries for Tailwind/lightningcss
+        run: npm install --no-save lightningcss-linux-x64-gnu@1.32.0 @tailwindcss/oxide-linux-x64-gnu@4.3.3
+
       # NEXT_PUBLIC_* vars are inlined into the client bundle at build time,
       # not read at runtime — they have to be here, not just as Worker
       # secrets. Both are the public anon key/URL, safe to be plain secrets
