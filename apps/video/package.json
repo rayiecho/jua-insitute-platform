@@ -6,7 +6,8 @@
   "scripts": {
     "synthesize": "node scripts/synthesize.mjs",
     "render": "node scripts/render.mjs",
-    "upload": "node scripts/upload.mjs"
+    "upload": "node scripts/upload.mjs",
+    "generate-lesson": "node scripts/generate-lesson-video.mjs"
   },
   "dependencies": {
     "@remotion/bundler": "^4.0.515",

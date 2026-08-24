@@ -1,42 +1,57 @@
 [
   {
-    "id": "title",
-    "type": "Title",
-    "narration": "Welcome to Python Programming, at Jua Institute. If you've never written a line of code before, this is exactly the right place to start."
+    "id": "getting-input-and-printing-output-title",
+    "type": "LessonTitle",
+    "heading": "Getting Input and Printing Output",
+    "subheading": "Jua Institute",
+    "narration": "Getting Input and Printing Output."
   },
   {
-    "id": "roadmap",
-    "type": "Roadmap",
-    "narration": "This program runs thirteen weeks. Twelve real, working weeks, each built around one skill you'll actually use, followed by a final project, where you design and build a complete application on your own."
+    "id": "getting-input-and-printing-output-code-0",
+    "type": "Code",
+    "heading": "Print with f-string",
+    "code": "name = \"Amara\"\nage = 24\n\nprint(f\"{name} is {age} years old.\")\n# Amara is 24 years old.",
+    "narration": "Here we use print with an f-string. The f before the quote tells Python to evaluate expressions inside braces. Whatever we put inside the braces is replaced by its value. This lets us mix text and variables cleanly."
   },
   {
-    "id": "skills",
-    "type": "SkillProgression",
-    "narration": "You'll start with the true basics. Variables, and how a program actually runs. Then control flow, teaching a program to make real decisions. Real data structures. Functions. And by the second half, object oriented programming, working with real files and real data from the internet, and the advanced patterns that separate someone who can write Python, from someone who writes it fluently."
+    "id": "getting-input-and-printing-output-code-1",
+    "type": "Code",
+    "heading": "Formatting numbers",
+    "code": "price = 49.999\nprint(f\"Total: ${price:.2f}\")\n# Total: $50.00",
+    "narration": "In this example we add a format specifier inside the braces. The : .2f tells Python to round the number to two decimal places and display it as a fixed‑point number. This is useful for prices, percentages, and measurements."
   },
   {
-    "id": "live",
-    "type": "LiveSession",
-    "narration": "Twice a week, you'll have a live, forty five minute session with your tutor. These aren't lectures. You'll write real code together, live, with your tutor watching your screen and helping in real time."
+    "id": "getting-input-and-printing-output-code-2",
+    "type": "Code",
+    "heading": "Getting user input",
+    "code": "name = input(\"What's your name? \")\nprint(f\"Hello, {name}!\")",
+    "narration": "This line pauses the program and asks the user for a response. Whatever the user types is returned as a string, even if it looks like a number. That means the variable holds text, not a numeric value."
   },
   {
-    "id": "practice",
-    "type": "Practice",
-    "narration": "Every week ends with real, hands on practice. Writing actual code in a real editor, checked automatically, with honest feedback on what's working, and what to fix."
+    "id": "getting-input-and-printing-output-code-3",
+    "type": "Code",
+    "heading": "Error when adding strings",
+    "code": "age = input(\"How old are you? \")\nnext_year = age + 1   # This CRASHES",
+    "narration": "Here we try to add the string from input to another number. Python raises a TypeError because you cannot add a string and an integer. This is a common beginner mistake when handling input."
   },
   {
-    "id": "whypython",
-    "type": "Stat",
-    "narration": "Python is the most in demand programming language in the world right now. The language behind the AI boom, real data science, and a huge share of the software running today. It's also the single most recommended first language for beginners, because it reads almost like plain English."
+    "id": "getting-input-and-printing-output-code-4",
+    "type": "Code",
+    "heading": "Converting input to numbers",
+    "code": "age = input(\"How old are you? \")\nage = int(age)          # now it's a real integer\nnext_year = age + 1     # works\nprint(f\"Next year you'll be {next_year}.\")",
+    "narration": "To work with numeric values we convert the string to an int or float. int() turns the text into a whole number, while float() handles decimals. After conversion we can perform arithmetic safely."
   },
   {
-    "id": "noinstall",
-    "type": "NoInstall",
-    "narration": "You won't need to install anything. Every exercise in this program runs right here, in your browser. Real Python, executing for real, with real output."
+    "id": "getting-input-and-printing-output-code-5",
+    "type": "Code",
+    "heading": "Putting it all together",
+    "code": "name = input(\"Name: \")\nscore1 = float(input(\"Score 1: \"))\nscore2 = float(input(\"Score 2: \"))\naverage = (score1 + score2) / 2\nprint(f\"{name}'s average score is {average:.1f}\")",
+    "narration": "This final program ties everything together. It asks for a name and two numbers, converts the numbers, calculates their sum, and prints a sentence with an f‑string. The output is clean and formatted, demonstrating the input‑process‑output pattern."
   },
   {
-    "id": "closing",
-    "type": "Closing",
-    "narration": "Thirteen weeks from now, you won't just know Python. You'll have built real, working programs, on your own. Let's start."
+    "id": "getting-input-and-printing-output-closing",
+    "type": "LessonClosing",
+    "heading": "Nice work.",
+    "narration": "That covers Getting Input and Printing Output. Head into the practice below to try it yourself."
   }
 ]

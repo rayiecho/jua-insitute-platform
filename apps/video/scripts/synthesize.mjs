@@ -18,16 +18,28 @@ function readEnvVar(filePath, name) {
 const DEEPGRAM_KEY = readEnvVar(path.join(ROOT, '..', 'agent', '.env.local'), 'DEEPGRAM_API_KEY');
 const VOICE_MODEL = 'aura-2-orpheus-en';
 
-async function synthesize(text, outPath) {
-  const res = await fetch(`https://api.deepgram.com/v1/speak?model=${VOICE_MODEL}&encoding=mp3`, {
-    method: 'POST',
-    headers: { Authorization: `Token ${DEEPGRAM_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text }),
-  });
-  if (!res.ok) throw new Error(`Deepgram TTS failed (${res.status}): ${await res.text()}`);
-  const buf = Buffer.from(await res.arrayBuffer());
-  fs.writeFileSync(outPath, buf);
-  return buf.length;
+// This network has confirmed, documented flakiness specifically on
+// Deepgram's endpoints (unrelated to LiveKit or generic HTTPS, verified
+// during earlier live-tutoring debugging) — retry transient socket drops
+// rather than failing the whole lesson over a single dropped connection.
+async function synthesize(text, outPath, attempt = 1) {
+  try {
+    const res = await fetch(`https://api.deepgram.com/v1/speak?model=${VOICE_MODEL}&encoding=mp3`, {
+      method: 'POST',
+      headers: { Authorization: `Token ${DEEPGRAM_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    });
+    if (!res.ok) throw new Error(`Deepgram TTS failed (${res.status}): ${await res.text()}`);
+    const buf = Buffer.from(await res.arrayBuffer());
+    fs.writeFileSync(outPath, buf);
+    return buf.length;
+  } catch (err) {
+    if (attempt >= 4) throw err;
+    const delayMs = attempt * 2000;
+    console.warn(`  (retry ${attempt}/3 after ${delayMs}ms — ${err.message || err})`);
+    await new Promise((r) => setTimeout(r, delayMs));
+    return synthesize(text, outPath, attempt + 1);
+  }
 }
 
 async function main() {

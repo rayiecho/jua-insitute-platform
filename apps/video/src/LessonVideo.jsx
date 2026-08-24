@@ -10,6 +10,10 @@ import { PracticeScene } from './scenes/PracticeScene';
 import { StatScene } from './scenes/StatScene';
 import { NoInstallScene } from './scenes/NoInstallScene';
 import { ClosingScene } from './scenes/ClosingScene';
+import { LessonTitleScene } from './scenes/LessonTitleScene';
+import { ConceptScene } from './scenes/ConceptScene';
+import { CodeScene } from './scenes/CodeScene';
+import { LessonClosingScene } from './scenes/LessonClosingScene';
 
 const SCENE_COMPONENTS = {
   Title: TitleScene,
@@ -20,6 +24,13 @@ const SCENE_COMPONENTS = {
   Stat: StatScene,
   NoInstall: NoInstallScene,
   Closing: ClosingScene,
+  // Generic, data-driven types used by the automated per-lesson pipeline
+  // (scripts/generate-lesson-video.mjs) — one video per real lesson, not
+  // hand-built like the types above.
+  LessonTitle: LessonTitleScene,
+  Concept: ConceptScene,
+  Code: CodeScene,
+  LessonClosing: LessonClosingScene,
 };
 
 const TRANSITION_FRAMES = 15;
@@ -29,7 +40,10 @@ const TRANSITION_FRAMES = 15;
 // subtle, consistent corner watermark so the video reads as "ours" even if
 // someone scrubs to the middle or a frame gets shared out of context.
 const DARK_BACKGROUND_SCENES = new Set(['LiveSession', 'Stat']);
-const WATERMARK_SCENES = new Set(['Roadmap', 'SkillProgression', 'LiveSession', 'Practice', 'Stat', 'NoInstall']);
+const WATERMARK_SCENES = new Set([
+  'Roadmap', 'SkillProgression', 'LiveSession', 'Practice', 'Stat', 'NoInstall',
+  'Concept', 'Code',
+]);
 
 function Watermark({ dark }) {
   return (
@@ -80,7 +94,7 @@ export const LessonVideo = ({ scenes, fraunces }) => {
     return (
       <Sequence key={scene.id} from={from} durationInFrames={scene.durationInFrames}>
         <SceneFade durationInFrames={scene.durationInFrames}>
-          <Component fraunces={fraunces} />
+          <Component fraunces={fraunces} scene={scene} />
           {WATERMARK_SCENES.has(scene.type) && <Watermark dark={DARK_BACKGROUND_SCENES.has(scene.type)} />}
         </SceneFade>
         <Audio src={scene.audioSrc} />
