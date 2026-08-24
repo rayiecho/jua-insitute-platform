@@ -42,28 +42,22 @@ jobs:
       # not read at runtime — they have to be here, not just as Worker
       # secrets. Both are the public anon key/URL, safe to be plain secrets
       # rather than requiring extra protection.
-      - name: Build and deploy
-        run: npm run cf:deploy
+      - name: Build
+        run: npx opennextjs-cloudflare build
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-      # server-side code (e.g. middleware.ts) reads these two at RUNTIME via
-      # process.env, populated from the Worker's own secret bindings — not
-      # just from the build-time env above, which only inlines them into
-      # the client bundle. A fresh `wrangler deploy` was observed live
-      # (2026-08-24) to serve requests without these, breaking the entire
-      # site with a "Supabase client" error, even though they were already
-      # set as Worker secrets from a prior manual run — re-asserting them
-      # on every deploy makes this self-healing regardless of the cause.
-      - name: Ensure runtime secrets are current
-        run: |
-          echo -n "$NEXT_PUBLIC_SUPABASE_URL" | npx wrangler secret put NEXT_PUBLIC_SUPABASE_URL
-          echo -n "$NEXT_PUBLIC_SUPABASE_ANON_KEY" | npx wrangler secret put NEXT_PUBLIC_SUPABASE_ANON_KEY
+      # Deliberately a bare `wrangler deploy`, NOT `opennextjs-cloudflare
+      # deploy` — that wrapper was observed live (2026-08-24, twice) to
+      # produce a Worker version missing the NEXT_PUBLIC_SUPABASE_URL/
+      # ANON_KEY secrets, breaking the entire site with a 500 on every
+      # request, even immediately after re-asserting those exact secrets
+      # via `wrangler secret put`. A plain `wrangler deploy` against the
+      # same build output has fixed it every time it was tried manually —
+      # this makes CI use that same proven path instead of the wrapper.
+      - name: Deploy
+        run: npx wrangler deploy
         env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
