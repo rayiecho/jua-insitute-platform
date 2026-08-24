@@ -8,7 +8,7 @@ export function ClosingScene({ fraunces }) {
   const { fps } = useVideoConfig();
   const logoScale = spring({ frame, fps, config: { damping: 12, mass: 0.6 } });
   const textOpacity = interpolate(frame, [20, 40], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
-  const lineWidth = interpolate(frame, [45, 65], [0, 160], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+  const lineWidth = interpolate(frame, [45, 65], [0, 220], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
 
   return (
     <AbsoluteFill
@@ -20,21 +20,21 @@ export function ClosingScene({ fraunces }) {
       }}
     >
       <div style={{ transform: `scale(${logoScale})` }}>
-        <JuaLogo size={110} />
+        <JuaLogo size={130} />
       </div>
       <div
         style={{
-          marginTop: 40,
+          marginTop: 48,
           opacity: textOpacity,
           fontFamily: fraunces,
           fontWeight: 600,
-          fontSize: 76,
+          fontSize: 92,
           color: COLORS.background,
         }}
       >
         Let's start.
       </div>
-      <div style={{ width: lineWidth, height: 4, backgroundColor: COLORS.gold, marginTop: 24, borderRadius: 2 }} />
+      <div style={{ width: lineWidth, height: 5, backgroundColor: COLORS.gold, marginTop: 30, borderRadius: 2 }} />
     </AbsoluteFill>
   );
 }

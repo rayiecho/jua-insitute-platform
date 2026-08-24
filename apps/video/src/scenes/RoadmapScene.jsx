@@ -17,19 +17,33 @@ export function RoadmapScene({ fraunces }) {
   });
   const litCount = Math.floor(progress * WEEKS);
 
-  const nodeGap = 118;
+  const nodeGap = 132;
   const totalWidth = (WEEKS - 1) * nodeGap;
+  const glowOpacity = interpolate(frame, [0, 40], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
 
   return (
-    <AbsoluteFill style={{ backgroundColor: COLORS.background, justifyContent: 'center', alignItems: 'center' }}>
+    <AbsoluteFill style={{ backgroundColor: COLORS.background }}>
+      <div
+        style={{
+          position: 'absolute',
+          top: -280,
+          right: -280,
+          width: 900,
+          height: 900,
+          borderRadius: '50%',
+          opacity: glowOpacity * 0.12,
+          background: `radial-gradient(circle, ${COLORS.gold} 0%, transparent 68%)`,
+        }}
+      />
+      <AbsoluteFill style={{ justifyContent: 'center', alignItems: 'center' }}>
       <div
         style={{
           opacity: headerOpacity,
           fontFamily: fraunces,
           fontWeight: 600,
-          fontSize: 56,
+          fontSize: 72,
           color: COLORS.ink,
-          marginBottom: 90,
+          marginBottom: 110,
         }}
       >
         13 weeks. Zero to real programs.
@@ -65,10 +79,10 @@ export function RoadmapScene({ fraunces }) {
               key={i}
               style={{
                 position: 'absolute',
-                left: i * nodeGap - 12,
-                top: -8,
-                width: 28,
-                height: 28,
+                left: i * nodeGap - 15,
+                top: -11,
+                width: 34,
+                height: 34,
                 borderRadius: '50%',
                 backgroundColor: lit ? COLORS.gold : COLORS.card,
                 border: `3px solid ${lit ? COLORS.gold : COLORS.border}`,
@@ -87,6 +101,7 @@ export function RoadmapScene({ fraunces }) {
           );
         })}
       </div>
+      </AbsoluteFill>
     </AbsoluteFill>
   );
 }

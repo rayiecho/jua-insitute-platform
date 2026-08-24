@@ -33,6 +33,9 @@ function tokenizeLine(line) {
   return tokens;
 }
 
+// Redesigned 2026-08-24 alongside ConceptScene — the code window used to sit
+// at 1100px on a 1920px canvas with a huge caption above it; now it uses
+// nearly the full width and a much larger, more legible code/heading size.
 export function CodeScene({ fraunces, scene }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -41,19 +44,34 @@ export function CodeScene({ fraunces, scene }) {
   const windowIn = spring({ frame: frame - 12, fps, config: { damping: 16 } });
   const lines = (scene.code || '').split('\n');
 
+  const glowOpacity = interpolate(frame, [0, 40], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+
   return (
-    <AbsoluteFill style={{ backgroundColor: COLORS.background, justifyContent: 'center', alignItems: 'center' }}>
+    <AbsoluteFill style={{ backgroundColor: COLORS.background }}>
+      <div
+        style={{
+          position: 'absolute',
+          bottom: -300,
+          left: -300,
+          width: 950,
+          height: 950,
+          borderRadius: '50%',
+          opacity: glowOpacity * 0.12,
+          background: `radial-gradient(circle, ${COLORS.gold} 0%, transparent 68%)`,
+        }}
+      />
+      <AbsoluteFill style={{ justifyContent: 'center', alignItems: 'center' }}>
       {scene.heading && (
         <div
           style={{
             opacity: headerOpacity,
             fontFamily: fraunces,
             fontWeight: 600,
-            fontSize: 44,
+            fontSize: 56,
             color: COLORS.ink,
-            marginBottom: 40,
+            marginBottom: 46,
             textAlign: 'center',
-            maxWidth: 1200,
+            maxWidth: 1600,
           }}
         >
           {scene.heading}
@@ -63,28 +81,37 @@ export function CodeScene({ fraunces, scene }) {
         style={{
           opacity: windowIn,
           transform: `translateY(${interpolate(windowIn, [0, 1], [30, 0])}px)`,
-          width: 1100,
-          borderRadius: 16,
+          width: 1620,
+          borderRadius: 18,
           overflow: 'hidden',
           border: `2px solid ${COLORS.border}`,
-          boxShadow: '0 20px 60px rgba(0,0,0,0.12)',
+          boxShadow: '0 24px 70px rgba(0,0,0,0.14)',
         }}
       >
         <div
           style={{
             backgroundColor: COLORS.card,
-            padding: '14px 24px',
+            padding: '16px 28px',
             display: 'flex',
             alignItems: 'center',
             gap: 10,
             borderBottom: `1px solid ${COLORS.border}`,
           }}
         >
-          <div style={{ width: 11, height: 11, borderRadius: '50%', backgroundColor: '#e06050' }} />
-          <div style={{ width: 11, height: 11, borderRadius: '50%', backgroundColor: '#e0c050' }} />
-          <div style={{ width: 11, height: 11, borderRadius: '50%', backgroundColor: '#60c050' }} />
+          <div style={{ width: 12, height: 12, borderRadius: '50%', backgroundColor: '#e06050' }} />
+          <div style={{ width: 12, height: 12, borderRadius: '50%', backgroundColor: '#e0c050' }} />
+          <div style={{ width: 12, height: 12, borderRadius: '50%', backgroundColor: '#60c050' }} />
         </div>
-        <div style={{ backgroundColor: COLORS.ink, padding: '32px 36px' }}>
+        <div
+          style={{
+            backgroundColor: COLORS.ink,
+            padding: '0 60px',
+            minHeight: 560,
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+          }}
+        >
           {lines.map((line, i) => {
             const lineIn = interpolate(frame, [22 + i * 5, 34 + i * 5], [0, 1], {
               extrapolateLeft: 'clamp',
@@ -97,8 +124,8 @@ export function CodeScene({ fraunces, scene }) {
                   opacity: lineIn,
                   transform: `translateX(${interpolate(lineIn, [0, 1], [-16, 0])}px)`,
                   fontFamily: 'Courier New, monospace',
-                  fontSize: 26,
-                  lineHeight: 1.6,
+                  fontSize: 34,
+                  lineHeight: 1.65,
                   whiteSpace: 'pre',
                 }}
               >
@@ -107,12 +134,13 @@ export function CodeScene({ fraunces, scene }) {
                     {tok.text}
                   </span>
                 ))}
-                {line === '' && ' '}
+                {line === '' && ' '}
               </div>
             );
           })}
         </div>
       </div>
+      </AbsoluteFill>
     </AbsoluteFill>
   );
 }

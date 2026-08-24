@@ -5,55 +5,67 @@ import { COLORS } from '../theme';
 // A plain-explanation beat — no code, just the idea itself. Used for
 // definitions, "why this matters," and conceptual framing between code
 // demonstrations.
+//
+// Redesigned 2026-08-24: the first pass centered a modest block of text in
+// the middle of a 1920x1080 canvas, leaving most of the frame empty
+// (real feedback: "most of our video screen is not utilized"). This version
+// uses the full width, left-aligns for a stronger read, and fills the right
+// side with a soft brand glow instead of bare background.
 export function ConceptScene({ fraunces, scene }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
   const headingIn = spring({ frame, fps, config: { damping: 16 } });
-  const lineWidth = interpolate(frame, [18, 38], [0, 140], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+  const lineWidth = interpolate(frame, [18, 38], [0, 180], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
   const bodyOpacity = interpolate(frame, [28, 48], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+  const glowOpacity = interpolate(frame, [0, 40], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
 
   return (
-    <AbsoluteFill
-      style={{
-        backgroundColor: COLORS.background,
-        justifyContent: 'center',
-        alignItems: 'center',
-        flexDirection: 'column',
-        padding: '0 180px',
-      }}
-    >
+    <AbsoluteFill style={{ backgroundColor: COLORS.background }}>
       <div
         style={{
-          opacity: headingIn,
-          transform: `translateY(${interpolate(headingIn, [0, 1], [24, 0])}px)`,
-          fontFamily: fraunces,
-          fontWeight: 600,
-          fontSize: 58,
-          color: COLORS.ink,
-          textAlign: 'center',
-          lineHeight: 1.2,
+          position: 'absolute',
+          top: -260,
+          right: -260,
+          width: 900,
+          height: 900,
+          borderRadius: '50%',
+          opacity: glowOpacity * 0.14,
+          background: `radial-gradient(circle, ${COLORS.gold} 0%, transparent 68%)`,
         }}
-      >
-        {scene.heading}
-      </div>
-      <div style={{ width: lineWidth, height: 4, backgroundColor: COLORS.gold, marginTop: 24, borderRadius: 2 }} />
-      {scene.body && (
+      />
+      <AbsoluteFill style={{ justifyContent: 'center', padding: '0 140px' }}>
         <div
           style={{
-            marginTop: 32,
-            opacity: bodyOpacity,
-            fontFamily: 'Arial, sans-serif',
-            fontSize: 30,
-            color: 'rgba(20,20,20,0.72)',
-            textAlign: 'center',
-            lineHeight: 1.5,
-            maxWidth: 1100,
+            opacity: headingIn,
+            transform: `translateY(${interpolate(headingIn, [0, 1], [24, 0])}px)`,
+            fontFamily: fraunces,
+            fontWeight: 600,
+            fontSize: 88,
+            color: COLORS.ink,
+            lineHeight: 1.12,
+            maxWidth: 1580,
           }}
         >
-          {scene.body}
+          {scene.heading}
         </div>
-      )}
+        <div style={{ width: lineWidth, height: 5, backgroundColor: COLORS.gold, marginTop: 34, borderRadius: 2 }} />
+        {scene.body && (
+          <div
+            style={{
+              marginTop: 40,
+              opacity: bodyOpacity,
+              fontFamily: 'Arial, sans-serif',
+              fontSize: 40,
+              color: 'rgba(20,20,20,0.72)',
+              lineHeight: 1.55,
+              maxWidth: 1450,
+            }}
+          >
+            {scene.body}
+          </div>
+        )}
+      </AbsoluteFill>
     </AbsoluteFill>
   );
 }

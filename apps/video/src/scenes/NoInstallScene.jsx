@@ -16,9 +16,9 @@ export function NoInstallScene({ fraunces }) {
           opacity: headerOpacity,
           fontFamily: fraunces,
           fontWeight: 600,
-          fontSize: 52,
+          fontSize: 68,
           color: COLORS.ink,
-          marginBottom: 56,
+          marginBottom: 76,
         }}
       >
         Nothing to install
@@ -27,43 +27,43 @@ export function NoInstallScene({ fraunces }) {
         style={{
           opacity: windowIn,
           transform: `translateY(${interpolate(windowIn, [0, 1], [30, 0])}px)`,
-          width: 760,
-          borderRadius: 16,
+          width: 1080,
+          borderRadius: 18,
           overflow: 'hidden',
           border: `2px solid ${COLORS.border}`,
-          boxShadow: '0 20px 60px rgba(0,0,0,0.1)',
+          boxShadow: '0 24px 70px rgba(0,0,0,0.1)',
         }}
       >
         <div
           style={{
             backgroundColor: COLORS.card,
-            padding: '14px 24px',
+            padding: '18px 28px',
             display: 'flex',
             alignItems: 'center',
-            gap: 12,
+            gap: 14,
             borderBottom: `1px solid ${COLORS.border}`,
           }}
         >
-          <div style={{ display: 'flex', gap: 8 }}>
-            <div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: '#e06050' }} />
-            <div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: '#e0c050' }} />
-            <div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: '#60c050' }} />
+          <div style={{ display: 'flex', gap: 10 }}>
+            <div style={{ width: 12, height: 12, borderRadius: '50%', backgroundColor: '#e06050' }} />
+            <div style={{ width: 12, height: 12, borderRadius: '50%', backgroundColor: '#e0c050' }} />
+            <div style={{ width: 12, height: 12, borderRadius: '50%', backgroundColor: '#60c050' }} />
           </div>
           <div
             style={{
               flex: 1,
               textAlign: 'center',
               fontFamily: 'Arial, sans-serif',
-              fontSize: 20,
+              fontSize: 24,
               color: COLORS.ink,
               opacity: 0.5,
             }}
           >
-            jua-institute.vercel.app
+            jua-institute.com
           </div>
         </div>
-        <div style={{ backgroundColor: COLORS.ink, padding: '40px 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ fontFamily: 'Courier New, monospace', fontSize: 26, color: '#e8ddc9' }}>
+        <div style={{ backgroundColor: COLORS.ink, padding: '56px 44px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ fontFamily: 'Courier New, monospace', fontSize: 34, color: '#e8ddc9' }}>
             print("Hello, world!")
           </div>
           <div
@@ -72,9 +72,9 @@ export function NoInstallScene({ fraunces }) {
               color: COLORS.ink,
               fontFamily: 'Arial, sans-serif',
               fontWeight: 700,
-              fontSize: 22,
-              padding: '10px 22px',
-              borderRadius: 8,
+              fontSize: 28,
+              padding: '14px 28px',
+              borderRadius: 10,
               opacity: runGlow,
             }}
           >

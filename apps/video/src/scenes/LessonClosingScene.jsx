@@ -11,7 +11,7 @@ export function LessonClosingScene({ fraunces, scene }) {
   const { fps } = useVideoConfig();
   const logoScale = spring({ frame, fps, config: { damping: 12, mass: 0.6 } });
   const textOpacity = interpolate(frame, [20, 40], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
-  const lineWidth = interpolate(frame, [45, 65], [0, 160], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+  const lineWidth = interpolate(frame, [45, 65], [0, 220], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
 
   return (
     <AbsoluteFill
@@ -24,18 +24,19 @@ export function LessonClosingScene({ fraunces, scene }) {
       }}
     >
       <div style={{ transform: `scale(${logoScale})` }}>
-        <JuaLogo size={100} />
+        <JuaLogo size={130} />
       </div>
       <div
         style={{
-          marginTop: 36,
+          marginTop: 44,
           opacity: textOpacity,
           fontFamily: fraunces,
           fontWeight: 600,
-          fontSize: 60,
+          fontSize: 84,
           color: COLORS.background,
           textAlign: 'center',
           lineHeight: 1.2,
+          maxWidth: 1600,
         }}
       >
         {scene.heading}

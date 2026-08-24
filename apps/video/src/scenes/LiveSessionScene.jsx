@@ -17,8 +17,8 @@ function Avatar({ label, delay, frame, fps }) {
     >
       <div
         style={{
-          width: 140,
-          height: 140,
+          width: 180,
+          height: 180,
           borderRadius: '50%',
           backgroundColor: COLORS.card,
           border: `3px solid ${COLORS.gold}`,
@@ -27,12 +27,12 @@ function Avatar({ label, delay, frame, fps }) {
           justifyContent: 'center',
         }}
       >
-        <svg width="70" height="70" viewBox="0 0 24 24" fill="none" stroke={COLORS.gold} strokeWidth="1.6">
+        <svg width="90" height="90" viewBox="0 0 24 24" fill="none" stroke={COLORS.gold} strokeWidth="1.6">
           <circle cx="12" cy="8" r="4" />
           <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" strokeLinecap="round" />
         </svg>
       </div>
-      <div style={{ fontFamily: 'Arial, sans-serif', fontSize: 26, color: COLORS.ink, fontWeight: 600 }}>{label}</div>
+      <div style={{ fontFamily: 'Arial, sans-serif', fontSize: 30, color: COLORS.background, fontWeight: 600 }}>{label}</div>
     </div>
   );
 }
@@ -50,19 +50,19 @@ export function LiveSessionScene({ fraunces }) {
           opacity: headerOpacity,
           fontFamily: fraunces,
           fontWeight: 600,
-          fontSize: 52,
+          fontSize: 68,
           color: COLORS.background,
-          marginBottom: 70,
+          marginBottom: 90,
         }}
       >
         Twice a week, live with your tutor
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 70 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 90 }}>
         <Avatar label="You" delay={15} frame={frame} fps={fps} />
         <div
           style={{
-            width: 18,
-            height: 18,
+            width: 22,
+            height: 22,
             borderRadius: '50%',
             backgroundColor: COLORS.gold,
             transform: `scale(${pulse})`,
@@ -73,10 +73,10 @@ export function LiveSessionScene({ fraunces }) {
       </div>
       <div
         style={{
-          marginTop: 60,
+          marginTop: 76,
           opacity: interpolate(frame, [55, 75], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }),
           fontFamily: 'Arial, sans-serif',
-          fontSize: 30,
+          fontSize: 34,
           color: 'rgba(255,255,255,0.6)',
         }}
       >

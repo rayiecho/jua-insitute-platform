@@ -1,9 +1,34 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
+
+function ffmpegPath() {
+  const platformPkg = fs
+    .readdirSync(path.join(ROOT, 'node_modules', '@remotion'))
+    .find((name) => name.startsWith('compositor-'));
+  return path.join(ROOT, 'node_modules', '@remotion', platformPkg, process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg');
+}
+
+// Raw Deepgram Aura output measured at -25.6 LUFS — well below the ~-14
+// LUFS video/streaming loudness standard (confirmed live, 2026-08-24,
+// hence the "volume too low" note). Normalizing every clip to -14 LUFS
+// here instead of trying to fix it in Remotion, since ffmpeg's loudnorm
+// does real integrated-loudness measurement instead of a blind gain
+// multiply that could clip.
+function normalizeLoudness(filePath) {
+  const tmpPath = filePath + '.norm.mp3';
+  execFileSync(ffmpegPath(), [
+    '-y', '-i', filePath,
+    '-af', 'loudnorm=I=-11:TP=-0.3:LRA=11',
+    '-ar', '44100',
+    tmpPath,
+  ], { stdio: ['ignore', 'ignore', 'ignore'] });
+  fs.renameSync(tmpPath, filePath);
+}
 
 function readEnvVar(filePath, name) {
   const content = fs.readFileSync(filePath, 'utf-8');
@@ -32,7 +57,8 @@ async function synthesize(text, outPath, attempt = 1) {
     if (!res.ok) throw new Error(`Deepgram TTS failed (${res.status}): ${await res.text()}`);
     const buf = Buffer.from(await res.arrayBuffer());
     fs.writeFileSync(outPath, buf);
-    return buf.length;
+    normalizeLoudness(outPath);
+    return fs.statSync(outPath).size;
   } catch (err) {
     if (attempt >= 4) throw err;
     const delayMs = attempt * 2000;
