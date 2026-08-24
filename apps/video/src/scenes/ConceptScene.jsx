@@ -34,32 +34,32 @@ export function ConceptScene({ fraunces, scene }) {
           background: `radial-gradient(circle, ${COLORS.gold} 0%, transparent 68%)`,
         }}
       />
-      <AbsoluteFill style={{ justifyContent: 'center', padding: '0 140px' }}>
+      <AbsoluteFill style={{ justifyContent: 'center', padding: '0 110px' }}>
         <div
           style={{
             opacity: headingIn,
             transform: `translateY(${interpolate(headingIn, [0, 1], [24, 0])}px)`,
             fontFamily: fraunces,
             fontWeight: 600,
-            fontSize: 88,
+            fontSize: 96,
             color: COLORS.ink,
-            lineHeight: 1.12,
-            maxWidth: 1580,
+            lineHeight: 1.1,
+            maxWidth: 1700,
           }}
         >
           {scene.heading}
         </div>
-        <div style={{ width: lineWidth, height: 5, backgroundColor: COLORS.gold, marginTop: 34, borderRadius: 2 }} />
+        <div style={{ width: lineWidth, height: 5, backgroundColor: COLORS.gold, marginTop: 36, borderRadius: 2 }} />
         {scene.body && (
           <div
             style={{
-              marginTop: 40,
+              marginTop: 44,
               opacity: bodyOpacity,
               fontFamily: 'Arial, sans-serif',
-              fontSize: 40,
+              fontSize: 44,
               color: 'rgba(20,20,20,0.72)',
               lineHeight: 1.55,
-              maxWidth: 1450,
+              maxWidth: 1560,
             }}
           >
             {scene.body}

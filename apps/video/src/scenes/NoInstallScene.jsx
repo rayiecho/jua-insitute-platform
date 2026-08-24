@@ -63,7 +63,7 @@ export function NoInstallScene({ fraunces }) {
           </div>
         </div>
         <div style={{ backgroundColor: COLORS.ink, padding: '56px 44px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ fontFamily: 'Courier New, monospace', fontSize: 34, color: '#e8ddc9' }}>
+          <div style={{ fontFamily: 'Courier New, monospace', fontSize: 40, color: '#e8ddc9' }}>
             print("Hello, world!")
           </div>
           <div

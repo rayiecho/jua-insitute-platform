@@ -67,11 +67,11 @@ export function CodeScene({ fraunces, scene }) {
             opacity: headerOpacity,
             fontFamily: fraunces,
             fontWeight: 600,
-            fontSize: 56,
+            fontSize: 62,
             color: COLORS.ink,
-            marginBottom: 46,
+            marginBottom: 50,
             textAlign: 'center',
-            maxWidth: 1600,
+            maxWidth: 1700,
           }}
         >
           {scene.heading}
@@ -81,7 +81,7 @@ export function CodeScene({ fraunces, scene }) {
         style={{
           opacity: windowIn,
           transform: `translateY(${interpolate(windowIn, [0, 1], [30, 0])}px)`,
-          width: 1620,
+          width: 1740,
           borderRadius: 18,
           overflow: 'hidden',
           border: `2px solid ${COLORS.border}`,
@@ -105,8 +105,8 @@ export function CodeScene({ fraunces, scene }) {
         <div
           style={{
             backgroundColor: COLORS.ink,
-            padding: '0 60px',
-            minHeight: 560,
+            padding: '0 70px',
+            minHeight: 660,
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'center',
@@ -124,7 +124,7 @@ export function CodeScene({ fraunces, scene }) {
                   opacity: lineIn,
                   transform: `translateX(${interpolate(lineIn, [0, 1], [-16, 0])}px)`,
                   fontFamily: 'Courier New, monospace',
-                  fontSize: 34,
+                  fontSize: 44,
                   lineHeight: 1.65,
                   whiteSpace: 'pre',
                 }}

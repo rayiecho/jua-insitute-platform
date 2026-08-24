@@ -48,7 +48,7 @@ export function PracticeScene({ fraunces }) {
         </div>
         <div style={{ backgroundColor: COLORS.ink, padding: '44px 44px 56px' }}>
           {LINES.map((line, i) => (
-            <div key={i} style={{ fontFamily: 'Courier New, monospace', fontSize: 34, color: line.color, lineHeight: 1.7 }}>
+            <div key={i} style={{ fontFamily: 'Courier New, monospace', fontSize: 40, color: line.color, lineHeight: 1.7 }}>
               {line.text || ' '}
             </div>
           ))}

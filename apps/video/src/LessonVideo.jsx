@@ -74,6 +74,40 @@ function Watermark({ dark }) {
   );
 }
 
+// A persistent "Tutor speaking" indicator — the equivalent of a video-call
+// avatar that pulses with sound waves when your camera's off. Bars animate
+// continuously (not analyzed from the real audio waveform — narration
+// plays through nearly the entire video anyway, so a simple always-on
+// pulse reads the same and is far simpler, as requested).
+function SpeakingIndicator() {
+  const frame = useCurrentFrame();
+  const bars = [0, 1, 2, 3].map((i) => 7 + 11 * Math.abs(Math.sin(frame / 5 + i * 0.85)));
+
+  return (
+    <div style={{ position: 'absolute', top: 44, left: 52, display: 'flex', alignItems: 'center', gap: 14 }}>
+      <div
+        style={{
+          width: 56,
+          height: 56,
+          borderRadius: '50%',
+          backgroundColor: COLORS.gold,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: '0 6px 16px rgba(200,134,43,0.35)',
+        }}
+      >
+        <span style={{ fontFamily: 'Georgia, serif', fontWeight: 700, fontSize: 26, color: COLORS.ink }}>T</span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5, height: 30 }}>
+        {bars.map((h, i) => (
+          <div key={i} style={{ width: 5, height: h, borderRadius: 3, backgroundColor: COLORS.gold }} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function SceneFade({ children, durationInFrames }) {
   const frame = useCurrentFrame();
   const opacity = interpolate(
@@ -96,6 +130,7 @@ export const LessonVideo = ({ scenes, fraunces }) => {
         <SceneFade durationInFrames={scene.durationInFrames}>
           <Component fraunces={fraunces} scene={scene} />
           {WATERMARK_SCENES.has(scene.type) && <Watermark dark={DARK_BACKGROUND_SCENES.has(scene.type)} />}
+          <SpeakingIndicator />
         </SceneFade>
         <Audio src={scene.audioSrc} />
       </Sequence>
