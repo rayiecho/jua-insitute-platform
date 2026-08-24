@@ -30,10 +30,20 @@ export function LessonHelpChat({ context, autoOpen = false }: { context: LessonH
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages]);
+
+  // Auto-grow with content (pasted code, multi-line questions) instead of
+  // staying a fixed single-line strip with dead space above it.
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 240)}px`;
+  }, [input]);
 
   async function send(e: React.FormEvent) {
     e.preventDefault();
@@ -105,12 +115,20 @@ export function LessonHelpChat({ context, autoOpen = false }: { context: LessonH
         {error && <p className="mt-3 text-xs text-red-600">{error}</p>}
       </div>
 
-      <form onSubmit={send} className="flex gap-2 border-t border-border bg-card p-3">
-        <input
-          className="flex-1 rounded border border-border bg-background px-3 py-2 text-sm text-ink"
-          placeholder="What's confusing you?"
+      <form onSubmit={send} className="flex items-end gap-2 border-t border-border bg-card p-3">
+        <textarea
+          ref={textareaRef}
+          rows={2}
+          className="max-h-60 min-h-[64px] flex-1 resize-none rounded border border-border bg-background px-3 py-2 text-sm text-ink"
+          placeholder="What's confusing you? (paste code if it helps)"
           value={input}
           onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              send(e);
+            }
+          }}
         />
         <button
           type="submit"

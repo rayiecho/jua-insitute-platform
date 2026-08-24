@@ -29,7 +29,12 @@ export function MonacoAssignment({ learnerId, assignmentId, starterCode, lessonT
   const [loaded, setLoaded] = useState(false);
   const [grading, setGrading] = useState(false);
   const [grade, setGrade] = useState<GradeResult | null>(null);
+  const [running, setRunning] = useState(false);
+  const [output, setOutput] = useState<string | null>(null);
+  const [runError, setRunError] = useState<string | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Load any code the learner already had in progress for this assignment.
   useEffect(() => {
@@ -48,6 +53,21 @@ export function MonacoAssignment({ learnerId, assignmentId, starterCode, lessonT
       cancelled = true;
     };
   }, [learnerId, assignmentId]);
+
+  useEffect(() => {
+    const onChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', onChange);
+    return () => document.removeEventListener('fullscreenchange', onChange);
+  }, []);
+
+  function toggleFullscreen() {
+    if (!containerRef.current) return;
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+    } else {
+      containerRef.current.requestFullscreen();
+    }
+  }
 
   function handleChange(value: string | undefined) {
     const next = value ?? '';
@@ -69,6 +89,29 @@ export function MonacoAssignment({ learnerId, assignmentId, starterCode, lessonT
         setStatus('error');
       }
     }, DEBOUNCE_MS);
+  }
+
+  // Real execution + output, distinct from "Submit for grading" — this is
+  // for iterating (write, run, see stdout/errors, fix, run again) the way
+  // a real editor's integrated terminal works, without committing to a
+  // graded submission each time.
+  async function handleRun() {
+    setRunning(true);
+    setRunError(null);
+    try {
+      const res = await fetch('/api/run-snippet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Failed to run');
+      setOutput(data.output || '(no output)');
+    } catch (err) {
+      setRunError(err instanceof Error ? err.message : 'Something went wrong');
+    } finally {
+      setRunning(false);
+    }
   }
 
   async function handleSubmitForGrading() {
@@ -109,7 +152,10 @@ export function MonacoAssignment({ learnerId, assignmentId, starterCode, lessonT
   }
 
   return (
-    <div className="flex h-[600px] flex-col gap-3 xl:h-full">
+    <div
+      ref={containerRef}
+      className="flex h-[600px] flex-col gap-3 xl:h-full [&:fullscreen]:h-screen [&:fullscreen]:gap-4 [&:fullscreen]:overflow-y-auto [&:fullscreen]:bg-background [&:fullscreen]:p-6"
+    >
       <div className="flex flex-1 flex-col overflow-hidden rounded-xl border border-border shadow-sm">
         <div className="flex items-center justify-between border-b border-ink/10 bg-[#1e1e1e] px-4 py-2 text-xs text-white/60">
           <span className="flex items-center gap-2 font-mono">
@@ -118,9 +164,27 @@ export function MonacoAssignment({ learnerId, assignmentId, starterCode, lessonT
             <span className="h-2.5 w-2.5 rounded-full bg-[#27c93f]" />
             <span className="ml-1">assignment.py</span>
           </span>
-          <span className={status === 'error' ? 'text-red-400' : 'text-white/40'}>{statusLabel[status]}</span>
+          <div className="flex items-center gap-3">
+            <span className={status === 'error' ? 'text-red-400' : 'text-white/40'}>{statusLabel[status]}</span>
+            <button
+              type="button"
+              onClick={toggleFullscreen}
+              aria-label={isFullscreen ? 'Exit fullscreen' : 'Expand editor'}
+              className="text-white/50 hover:text-white"
+            >
+              {isFullscreen ? (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M9 4v3a2 2 0 0 1-2 2H4M15 4v3a2 2 0 0 0 2 2h3M9 20v-3a2 2 0 0 0-2-2H4M15 20v-3a2 2 0 0 1 2-2h3" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              )}
+            </button>
+          </div>
         </div>
-        <div className="flex-1">
+        <div className={isFullscreen ? 'h-[45vh]' : 'flex-1'}>
           <Editor
             height="100%"
             defaultLanguage="python"
@@ -136,6 +200,30 @@ export function MonacoAssignment({ learnerId, assignmentId, starterCode, lessonT
               fontFamily: 'var(--font-mono), Menlo, Consolas, monospace',
             }}
           />
+        </div>
+
+        {/* Integrated terminal — shows real stdout/stderr from actually
+            running the code, the way a real editor's terminal panel does,
+            separate from the graded-submission flow below. */}
+        <div className="border-t border-ink/10 bg-[#1e1e1e]">
+          <div className="flex items-center justify-between px-4 py-2">
+            <span className="font-mono text-xs uppercase tracking-wide text-white/40">Terminal</span>
+            <button
+              type="button"
+              onClick={handleRun}
+              disabled={running}
+              className="rounded bg-gold px-3 py-1 text-xs font-semibold text-ink disabled:opacity-50"
+            >
+              {running ? 'Running…' : '▶ Run'}
+            </button>
+          </div>
+          <div className={`overflow-y-auto px-4 pb-3 font-mono text-xs text-white/90 ${isFullscreen ? 'max-h-[30vh]' : 'max-h-40'}`}>
+            {runError && <p className="text-red-400">{runError}</p>}
+            {output !== null && !runError && <pre className="whitespace-pre-wrap">{output}</pre>}
+            {output === null && !runError && !running && (
+              <p className="text-white/30">Press Run to execute your code and see the output here.</p>
+            )}
+          </div>
         </div>
       </div>
 

@@ -14,10 +14,11 @@ export async function POST(request: Request) {
   if (typeof code !== 'string' || !code.trim()) {
     return NextResponse.json({ error: 'code is required' }, { status: 400 });
   }
-  // A generous but real cap — this is meant for short illustrative
-  // snippets, not full programs, and keeps the sandbox call itself cheap.
-  if (code.length > 4000) {
-    return NextResponse.json({ error: 'Snippet is too long for the inline runner' }, { status: 400 });
+  // Also used by MonacoAssignment's "Run" terminal (full assignment-length
+  // code, not just inline lesson snippets), so the cap has to cover a real
+  // small program, not just a few illustrative lines.
+  if (code.length > 20000) {
+    return NextResponse.json({ error: 'Code is too long to run' }, { status: 400 });
   }
 
   try {
