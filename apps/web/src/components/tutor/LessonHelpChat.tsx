@@ -93,7 +93,7 @@ export function LessonHelpChat({ context, autoOpen = false }: { context: LessonH
         </button>
       </div>
 
-      <div ref={scrollRef} className="max-h-80 min-h-[140px] overflow-y-auto bg-card px-4 py-3">
+      <div ref={scrollRef} className="max-h-80 overflow-y-auto bg-card px-4 py-3">
         {messages.length === 0 && (
           <p className="text-sm text-ink/50">
             Ask what you're stuck on — I'll help you understand the concept, not just hand you the answer.
@@ -118,8 +118,8 @@ export function LessonHelpChat({ context, autoOpen = false }: { context: LessonH
       <form onSubmit={send} className="flex items-end gap-2 border-t border-border bg-card p-3">
         <textarea
           ref={textareaRef}
-          rows={2}
-          className="max-h-60 min-h-[64px] flex-1 resize-none rounded border border-border bg-background px-3 py-2 text-sm text-ink"
+          rows={3}
+          className="max-h-60 min-h-[96px] flex-1 resize-none rounded border border-border bg-background px-3 py-2 text-sm text-ink"
           placeholder="What's confusing you? (paste code if it helps)"
           value={input}
           onChange={(e) => setInput(e.target.value)}
