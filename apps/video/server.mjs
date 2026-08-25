@@ -100,7 +100,12 @@ app.post('/generate', async (req, res) => {
     return res.status(404).json({ error: err.message });
   }
 
-  const job = await createJob(node.id, 'generate');
+  let job;
+  try {
+    job = await createJob(node.id, 'generate');
+  } catch (err) {
+    return res.status(500).json({ error: `Could not create job: ${err.message}` });
+  }
   res.status(202).json({ jobId: job.id });
 
   enqueue(async () => {
@@ -132,7 +137,12 @@ app.post('/post-youtube', async (req, res) => {
     return res.status(400).json({ error: 'This lesson has no rendered video yet — generate one first.' });
   }
 
-  const job = await createJob(node.id, 'youtube_upload');
+  let job;
+  try {
+    job = await createJob(node.id, 'youtube_upload');
+  } catch (err) {
+    return res.status(500).json({ error: `Could not create job: ${err.message}` });
+  }
   res.status(202).json({ jobId: job.id });
 
   enqueue(async () => {
@@ -166,6 +176,14 @@ app.get('/jobs/:id', async (req, res) => {
   const [job] = await r.json();
   if (!job) return res.status(404).json({ error: 'Job not found' });
   res.json(job);
+});
+
+// Defense in depth: an unhandled rejection anywhere (a spot this file
+// missed wrapping) should log and keep serving other requests, not crash
+// the whole process — confirmed live (2026-08-25) that the missing
+// video_jobs table did exactly that before this was added.
+process.on('unhandledRejection', (err) => {
+  console.error('Unhandled rejection (not crashing):', err);
 });
 
 const PORT = process.env.PORT || 3001;
