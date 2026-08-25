@@ -61,21 +61,35 @@ Rules:
 Lesson content:
 ${strippedMarkdown}`;
 
-  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'openai/gpt-oss-20b',
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.4,
-      response_format: { type: 'json_object' },
-    }),
-  });
-  if (!res.ok) throw new Error(`Groq request failed (${res.status}): ${await res.text()}`);
-  const data = await res.json();
-  const content = data.choices?.[0]?.message?.content;
-  if (!content) throw new Error(`No content in Groq response: ${JSON.stringify(data)}`);
-  return JSON.parse(content);
+  // Asking for a full ~5 minute, 12-20 scene breakdown means a much larger
+  // structured JSON response than before, which makes Groq's own
+  // json_validate_failed generation errors (confirmed live, 2026-08-25)
+  // more likely to occur on any single attempt — retry rather than fail
+  // the whole job over one bad generation.
+  let lastErr;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${GROQ_API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'openai/gpt-oss-20b',
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.4,
+          response_format: { type: 'json_object' },
+        }),
+      });
+      if (!res.ok) throw new Error(`Groq request failed (${res.status}): ${await res.text()}`);
+      const data = await res.json();
+      const content = data.choices?.[0]?.message?.content;
+      if (!content) throw new Error(`No content in Groq response: ${JSON.stringify(data)}`);
+      return JSON.parse(content);
+    } catch (err) {
+      lastErr = err;
+      console.warn(`  (Groq attempt ${attempt}/3 failed: ${err.message})`);
+    }
+  }
+  throw lastErr;
 }
 
 export async function generateScenesForLesson(slug) {
