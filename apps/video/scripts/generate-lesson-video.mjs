@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { generateScenesForLesson } from './generate-script.mjs';
 import { uploadVideoAndPoster } from './upload.mjs';
@@ -9,6 +9,24 @@ import { getEnvVar } from './env.mjs';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const webEnv = path.join(ROOT, '..', 'web', '.env.local');
+
+// spawn (not execFileSync) so this doesn't block Node's event loop — the
+// deployed video-worker service needs to keep answering other requests
+// (job-status polling, health checks) while a render is in progress.
+// Confirmed live (2026-08-25): execFileSync froze the entire server for
+// the whole render duration.
+function runScript(scriptPath, args, log) {
+  return new Promise((resolve, reject) => {
+    const child = spawn('node', [scriptPath, ...args], { cwd: ROOT });
+    child.stdout.on('data', (d) => log(d.toString().trimEnd()));
+    child.stderr.on('data', (d) => log(d.toString().trimEnd()));
+    child.on('error', reject);
+    child.on('close', (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`${scriptPath} exited with code ${code}`));
+    });
+  });
+}
 
 async function setVideoUrl(nodeId, videoUrl) {
   const supabaseUrl = getEnvVar('NEXT_PUBLIC_SUPABASE_URL', webEnv);
@@ -42,11 +60,11 @@ export async function processLesson(slug, log = console.log) {
   fs.mkdirSync(audioDir, { recursive: true });
 
   log('Synthesizing narration audio (Deepgram, aura-2-orpheus-en)...');
-  execFileSync('node', ['scripts/synthesize.mjs', 'scenes.json'], { cwd: ROOT, stdio: 'inherit' });
+  await runScript('scripts/synthesize.mjs', ['scenes.json'], log);
 
   log('Rendering video...');
   const outputName = `${slug}.mp4`;
-  execFileSync('node', ['scripts/render.mjs', outputName], { cwd: ROOT, stdio: 'inherit' });
+  await runScript('scripts/render.mjs', [outputName], log);
 
   log('Uploading to Supabase Storage...');
   const { videoUrl, posterUrl } = await uploadVideoAndPoster(outputName);
