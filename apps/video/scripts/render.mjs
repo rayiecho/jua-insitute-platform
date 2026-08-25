@@ -82,12 +82,16 @@ async function main() {
     codec: 'h264',
     outputLocation,
     inputProps: { scenes },
-    // Default concurrency spawns one headless-Chrome tab per CPU core,
-    // which pushed peak memory to ~1GB and got OOM-killed (SIGKILL)
-    // partway through a real 5-minute render on Railway's default
-    // container (confirmed live, 2026-08-25). Capping it trades render
-    // speed for staying well under the memory ceiling.
-    concurrency: 2,
+    // Confirmed live (2026-08-25) this hits a hard ~1GB memory ceiling on
+    // the Railway container regardless of video length or concurrency —
+    // even a ~3 minute render at concurrency:2 got OOM-killed (SIGKILL).
+    // Chromium's per-frame memory is roughly proportional to resolution,
+    // unlike scene count, so rendering at 2/3 scale (1920x1080 composition
+    // -> actual 1280x720 output) is the real lever. All component layouts
+    // stay calibrated to the 1920x1080 composition space in Root.jsx —
+    // this only affects final render/output resolution.
+    scale: 2 / 3,
+    concurrency: 1,
     onProgress: ({ progress }) => {
       process.stdout.write(`\rRendering: ${Math.round(progress * 100)}%`);
     },
@@ -107,6 +111,7 @@ async function main() {
     output: posterLocation,
     inputProps: { scenes },
     imageFormat: 'jpeg',
+    scale: 2 / 3,
   });
   console.log(`DONE - poster rendered to ${posterLocation}`);
 }
