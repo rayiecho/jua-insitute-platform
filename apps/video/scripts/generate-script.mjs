@@ -1,22 +1,16 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { getEnvVar } from './env.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 
-function readEnvVar(filePath, name) {
-  const content = fs.readFileSync(filePath, 'utf-8');
-  const line = content.split('\n').find((l) => l.startsWith(name + '='));
-  if (!line) throw new Error(`${name} not found in ${filePath}`);
-  return line.slice(name.length + 1).trim();
-}
-
 const webEnv = path.join(ROOT, '..', 'web', '.env.local');
 const agentEnv = path.join(ROOT, '..', 'agent', '.env.local');
-const SUPABASE_URL = readEnvVar(webEnv, 'NEXT_PUBLIC_SUPABASE_URL');
-const SUPABASE_SERVICE_KEY = readEnvVar(webEnv, 'SUPABASE_SERVICE_ROLE_KEY');
-const GROQ_API_KEY = readEnvVar(agentEnv, 'GROQ_API_KEY');
+const SUPABASE_URL = getEnvVar('NEXT_PUBLIC_SUPABASE_URL', webEnv);
+const SUPABASE_SERVICE_KEY = getEnvVar('SUPABASE_SERVICE_ROLE_KEY', webEnv);
+const GROQ_API_KEY = getEnvVar('GROQ_API_KEY', agentEnv);
 
 export async function fetchLesson(slug) {
   const res = await fetch(
@@ -49,17 +43,17 @@ function stripForPrompt(markdown) {
 }
 
 async function callGroq(title, strippedMarkdown, codeBlockCount) {
-  const prompt = `You are writing the spoken narration script for a short teaching video, based on an existing, already-reviewed lesson from a real Python course. Lesson title: "${title}".
+  const prompt = `You are writing the spoken narration script for a full-length teaching video (target: about 5 minutes of narration, roughly 700-800 spoken words total), based on an existing, already-reviewed lesson from a real Python course. Lesson title: "${title}".
 
 Below is the lesson's content with its code examples replaced by placeholders like [CODE_BLOCK_0], [CODE_BLOCK_1], etc. (${codeBlockCount} code block(s) total, numbered in order of appearance).
 
-Your job: break this lesson into a short sequence of video scenes (5 to 8 scenes) that a narrator will read aloud over animated visuals. Two scene types only:
-- "Concept": explains one idea in plain spoken language (no code visible). Needs "heading" (a short phrase, under 8 words), "body" (one short supporting sentence, optional), and "narration" (what the narrator says out loud — natural spoken English, 2-4 sentences, NOT read verbatim from the markdown).
-- "Code": shows one existing code example while the narrator explains it. Needs "codeRef" (the integer index of the [CODE_BLOCK_N] it corresponds to — must reference a real block that exists), "heading" (a short caption, under 8 words), and "narration" (explaining what the code does and why, 2-4 sentences).
+Your job: break this lesson into a thorough sequence of video scenes (aim for 12-20 scenes — this is a full lesson video, not a short trailer) that a narrator will read aloud over animated visuals. Cover the lesson comprehensively: every major heading/section in the source content should map to at least one scene, not just the highlights. Two scene types only:
+- "Concept": explains one idea in plain spoken language (no code visible). Needs "heading" (a short phrase, under 8 words), "body" (one short supporting sentence, optional), and "narration" (what the narrator says out loud — natural spoken English, 3-6 sentences, NOT read verbatim from the markdown — elaborate and explain the "why," don't just restate the "what").
+- "Code": shows one existing code example while the narrator explains it. Needs "codeRef" (the integer index of the [CODE_BLOCK_N] it corresponds to — must reference a real block that exists), "heading" (a short caption, under 8 words), and "narration" (explaining what the code does, why it's written that way, and what the reader should notice, 3-6 sentences).
 
 Rules:
 - Every codeRef must be a real block index between 0 and ${codeBlockCount - 1}.
-- Cover every code block that's central to the lesson at least once.
+- Cover every code block in the lesson (use multiple Concept scenes around a single code block if it needs building up before AND explaining after).
 - Narration must only describe what's actually in the lesson — do not invent facts, numbers, or claims not present below.
 - Do not include a title/intro scene or a closing scene — those are added separately.
 - Respond with ONLY valid JSON, no markdown fences, no commentary: {"scenes": [...]}

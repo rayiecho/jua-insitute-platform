@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { getEnvVar } from './env.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -30,17 +31,10 @@ function normalizeLoudness(filePath) {
   fs.renameSync(tmpPath, filePath);
 }
 
-function readEnvVar(filePath, name) {
-  const content = fs.readFileSync(filePath, 'utf-8');
-  const line = content.split('\n').find((l) => l.startsWith(name + '='));
-  if (!line) throw new Error(`${name} not found in ${filePath}`);
-  return line.slice(name.length + 1).trim();
-}
-
 // Same voice as the live voice tutor (apps/agent/src/index.ts uses
 // aura-2-orpheus-en) — brand consistency between the live tutor's voice and
 // these narrated lesson videos.
-const DEEPGRAM_KEY = readEnvVar(path.join(ROOT, '..', 'agent', '.env.local'), 'DEEPGRAM_API_KEY');
+const DEEPGRAM_KEY = getEnvVar('DEEPGRAM_API_KEY', path.join(ROOT, '..', 'agent', '.env.local'));
 const VOICE_MODEL = 'aura-2-orpheus-en';
 
 // This network has confirmed, documented flakiness specifically on
