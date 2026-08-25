@@ -82,6 +82,12 @@ async function main() {
     codec: 'h264',
     outputLocation,
     inputProps: { scenes },
+    // Default concurrency spawns one headless-Chrome tab per CPU core,
+    // which pushed peak memory to ~1GB and got OOM-killed (SIGKILL)
+    // partway through a real 5-minute render on Railway's default
+    // container (confirmed live, 2026-08-25). Capping it trades render
+    // speed for staying well under the memory ceiling.
+    concurrency: 2,
     onProgress: ({ progress }) => {
       process.stdout.write(`\rRendering: ${Math.round(progress * 100)}%`);
     },
