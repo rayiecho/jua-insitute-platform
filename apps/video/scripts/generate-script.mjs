@@ -43,13 +43,13 @@ function stripForPrompt(markdown) {
 }
 
 async function callGroq(title, strippedMarkdown, codeBlockCount) {
-  const prompt = `You are writing the spoken narration script for a full-length teaching video (target: about 5 minutes of narration, roughly 700-800 spoken words total), based on an existing, already-reviewed lesson from a real Python course. Lesson title: "${title}".
+  const prompt = `You are writing the spoken narration script for a teaching video (target: about 2.5-3 minutes of narration, roughly 400-450 spoken words total), based on an existing, already-reviewed lesson from a real Python course. Lesson title: "${title}".
 
 Below is the lesson's content with its code examples replaced by placeholders like [CODE_BLOCK_0], [CODE_BLOCK_1], etc. (${codeBlockCount} code block(s) total, numbered in order of appearance).
 
-Your job: break this lesson into a thorough sequence of video scenes (aim for 12-20 scenes — this is a full lesson video, not a short trailer) that a narrator will read aloud over animated visuals. Cover the lesson comprehensively: every major heading/section in the source content should map to at least one scene, not just the highlights. Two scene types only:
-- "Concept": explains one idea in plain spoken language (no code visible). Needs "heading" (a short phrase, under 8 words), "body" (one short supporting sentence, optional), and "narration" (what the narrator says out loud — natural spoken English, 3-6 sentences, NOT read verbatim from the markdown — elaborate and explain the "why," don't just restate the "what").
-- "Code": shows one existing code example while the narrator explains it. Needs "codeRef" (the integer index of the [CODE_BLOCK_N] it corresponds to — must reference a real block that exists), "heading" (a short caption, under 8 words), and "narration" (explaining what the code does, why it's written that way, and what the reader should notice, 3-6 sentences).
+Your job: break this lesson into a sequence of video scenes (aim for 7-10 scenes) that a narrator will read aloud over animated visuals. Cover the lesson's main ideas, not every minor detail. Two scene types only:
+- "Concept": explains one idea in plain spoken language (no code visible). Needs "heading" (a short phrase, under 8 words), "body" (one short supporting sentence, optional), and "narration" (what the narrator says out loud — natural spoken English, 2-4 sentences, NOT read verbatim from the markdown — explain the "why," don't just restate the "what").
+- "Code": shows one existing code example while the narrator explains it. Needs "codeRef" (the integer index of the [CODE_BLOCK_N] it corresponds to — must reference a real block that exists), "heading" (a short caption, under 8 words), and "narration" (explaining what the code does and why it's written that way, 2-4 sentences).
 
 Rules:
 - Every codeRef must be a real block index between 0 and ${codeBlockCount - 1}.
