@@ -8,13 +8,19 @@ export function LogoMark({ className = '' }: { className?: string }) {
         const angle = (i * 30 * Math.PI) / 180;
         const r1 = 17;
         const r2 = 22;
+        // Math.cos/Math.sin can differ in the last decimal place between
+        // the server's and the browser's trig implementations — confirmed
+        // live as a real hydration-mismatch warning on every page load.
+        // Rounding to 3 decimals (invisible at this SVG scale) makes the
+        // server and client markup byte-identical.
+        const round = (n: number) => Math.round(n * 1000) / 1000;
         return (
           <line
             key={i}
-            x1={24 + r1 * Math.cos(angle)}
-            y1={24 + r1 * Math.sin(angle)}
-            x2={24 + r2 * Math.cos(angle)}
-            y2={24 + r2 * Math.sin(angle)}
+            x1={round(24 + r1 * Math.cos(angle))}
+            y1={round(24 + r1 * Math.sin(angle))}
+            x2={round(24 + r2 * Math.cos(angle))}
+            y2={round(24 + r2 * Math.sin(angle))}
             stroke="var(--color-gold)"
             strokeWidth="2.5"
             strokeLinecap="round"
