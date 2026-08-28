@@ -4,9 +4,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "synthesize": "node scripts/synthesize.mjs",
-    "render": "node scripts/render.mjs",
-    "upload": "node scripts/upload.mjs",
     "generate-lesson": "node scripts/generate-lesson-video.mjs",
     "start": "node server.mjs"
   },
