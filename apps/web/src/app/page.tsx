@@ -23,41 +23,42 @@ export default async function Home() {
       <SiteHeader />
       <main className="flex-1">
         {/* Hero */}
-        <section className="mx-auto w-full max-w-3xl px-6 pt-20 pb-16 text-center">
+        <section>
           <Reveal>
-            <div className="mx-auto mb-10 overflow-hidden rounded-2xl border border-border">
+            <div className="relative h-[60vh] min-h-[420px] w-full">
               <Image
                 src="https://pub-aefea01aecc44a379842b04ac827cd6a.r2.dev/output/brandimg_1787926154.jpg"
                 alt="Jua Institute"
-                width={1200}
-                height={630}
+                fill
                 priority
-                className="h-auto w-full object-cover"
+                className="object-cover"
               />
             </div>
           </Reveal>
-          <Reveal>
-            <h1 className="font-serif text-4xl font-semibold text-ink sm:text-5xl">
-              A real class. A tutor who never forgets where you are.
-            </h1>
-          </Reveal>
-          <Reveal delay={120}>
-            <p className="mx-auto mt-5 max-w-xl text-lg text-ink/70">
-              Jua Institute pairs project-based, self-paced programs with a live 1-on-1 AI tutor —
-              the same one every session, who already knows what you were building last time.
-            </p>
-          </Reveal>
-          <Reveal delay={240}>
-            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-              <Link
-                href="/programs"
-                className="rounded bg-gold px-6 py-3 text-sm font-semibold text-ink"
-              >
-                Explore programs
-              </Link>
-              <TalkToTutorButton className="rounded border border-border px-6 py-3 text-sm font-semibold text-ink hover:bg-card" />
-            </div>
-          </Reveal>
+          <div className="mx-auto w-full max-w-3xl px-6 pt-16 pb-16 text-center">
+            <Reveal>
+              <h1 className="font-serif text-4xl font-semibold text-ink sm:text-5xl">
+                A real class. A tutor who never forgets where you are.
+              </h1>
+            </Reveal>
+            <Reveal delay={120}>
+              <p className="mx-auto mt-5 max-w-xl text-lg text-ink/70">
+                Jua Institute pairs project-based, self-paced programs with a live 1-on-1 AI tutor —
+                the same one every session, who already knows what you were building last time.
+              </p>
+            </Reveal>
+            <Reveal delay={240}>
+              <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+                <Link
+                  href="/programs"
+                  className="rounded bg-gold px-6 py-3 text-sm font-semibold text-ink"
+                >
+                  Explore programs
+                </Link>
+                <TalkToTutorButton className="rounded border border-border px-6 py-3 text-sm font-semibold text-ink hover:bg-card" />
+              </div>
+            </Reveal>
+          </div>
         </section>
 
         {/* How it works */}
