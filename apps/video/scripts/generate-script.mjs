@@ -52,7 +52,7 @@ Your job: break this lesson into a sequence of video scenes (aim for 7-10 scenes
 - "Code": shows one existing code example while the narrator explains it. Needs "codeRef" (the integer index of the [CODE_BLOCK_N] it corresponds to — must reference a real block that exists), "heading" (a short caption, under 8 words), and "narration" (explaining what the code does and why it's written that way, 2-4 sentences).
 
 Rules:
-- Every codeRef must be a real block index between 0 and ${codeBlockCount - 1}.
+${codeBlockCount === 0 ? '- There are 0 code blocks in this lesson. Do NOT use the "Code" scene type at all — every scene must be "Concept".' : `- Every codeRef must be a real block index between 0 and ${codeBlockCount - 1}.`}
 - Cover every code block in the lesson (use multiple Concept scenes around a single code block if it needs building up before AND explaining after).
 - Narration must only describe what's actually in the lesson — do not invent facts, numbers, or claims not present below.
 - Do not include a title/intro scene or a closing scene — those are added separately.
@@ -115,6 +115,12 @@ export async function generateScenesForLesson(slug) {
     if (!s.type) {
       s.type = typeof s.codeRef === 'number' || s.code_ref !== undefined ? 'Code' : 'Concept';
       s.codeRef = s.codeRef ?? s.code_ref;
+    }
+    if (s.type === 'Code' && codeBlocks.length === 0) {
+      // No real code exists in this lesson to reference — the model
+      // hallucinated a Code scene anyway. Fall back to Concept rather than
+      // failing the whole render over one scene.
+      s.type = 'Concept';
     }
     if (s.type === 'Code') {
       if (typeof s.codeRef !== 'number' || s.codeRef < 0 || s.codeRef >= codeBlocks.length) {

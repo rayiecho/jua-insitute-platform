@@ -16,6 +16,14 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: path.join(__dirname, "../.."),
   },
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "pub-aefea01aecc44a379842b04ac827cd6a.r2.dev",
+      },
+    ],
+  },
 };
 
 export default nextConfig;

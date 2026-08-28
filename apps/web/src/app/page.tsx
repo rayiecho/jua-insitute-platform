@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { TalkToTutorButton } from '@/components/programs/TalkToTutorButton';
@@ -23,6 +24,18 @@ export default async function Home() {
       <main className="flex-1">
         {/* Hero */}
         <section className="mx-auto w-full max-w-3xl px-6 pt-20 pb-16 text-center">
+          <Reveal>
+            <div className="mx-auto mb-10 overflow-hidden rounded-2xl border border-border">
+              <Image
+                src="https://pub-aefea01aecc44a379842b04ac827cd6a.r2.dev/output/brandimg_1787926154.jpg"
+                alt="Jua Institute"
+                width={1200}
+                height={630}
+                priority
+                className="h-auto w-full object-cover"
+              />
+            </div>
+          </Reveal>
           <Reveal>
             <h1 className="font-serif text-4xl font-semibold text-ink sm:text-5xl">
               A real class. A tutor who never forgets where you are.
