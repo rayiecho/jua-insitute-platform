@@ -27,11 +27,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Video worker is not configured' }, { status: 500 });
   }
 
-  const res = await fetch(`${workerUrl}/generate`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${workerSecret}` },
-    body: JSON.stringify({ slug }),
-  });
-  const data = await res.json();
-  return NextResponse.json(data, { status: res.status });
+  try {
+    const res = await fetch(`${workerUrl}/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${workerSecret}` },
+      body: JSON.stringify({ slug }),
+    });
+    // The worker doesn't always answer with JSON (a cold start or a
+    // Railway edge error returns an HTML error page) — parsing that
+    // unconditionally threw here and produced Next's own generic HTML 500,
+    // which the client then also failed to parse silently. Guard both ends.
+    const data = await res.json().catch(() => null);
+    if (!data) {
+      return NextResponse.json({ error: `Video worker returned a non-JSON response (${res.status})` }, { status: 502 });
+    }
+    return NextResponse.json(data, { status: res.status });
+  } catch (err) {
+    return NextResponse.json({ error: `Could not reach video worker: ${err instanceof Error ? err.message : String(err)}` }, { status: 502 });
+  }
 }

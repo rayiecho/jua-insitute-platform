@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin';
+import { PageHeader, StatCard, TableShell } from '@/components/admin/ui';
 
 // CAT = Central Africa Time, UTC+2, no DST — the timezone this admin
 // dashboard is read in. datetime-local inputs below are interpreted as CAT
@@ -94,36 +95,35 @@ export default async function AdminAnalyticsPage({
 
   return (
     <div className="w-full max-w-5xl">
-      <h1 className="font-serif text-2xl font-semibold text-ink">Analytics</h1>
-      <p className="mt-1 text-sm text-ink/60">
-        Real page-view tracking, starting from when this was built (2026-08-19) — there&apos;s no data from before
-        that, since nothing was tracking visits yet.
-      </p>
+      <PageHeader
+        title="Analytics"
+        description="Real page-view tracking, starting from when this was built (2026-08-19) — there's no data from before that, since nothing was tracking visits yet."
+      />
 
-      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <StatCard label="Unique visitors today" value={String(todayUnique)} />
-        <StatCard label="All-time unique visitors" value={String(allTimeUnique)} />
-        <StatCard label="All-time page views" value={String(allTimeViews)} />
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <StatCard label="Unique visitors today" value={todayUnique} />
+        <StatCard label="All-time unique visitors" value={allTimeUnique} />
+        <StatCard label="All-time page views" value={allTimeViews} />
       </div>
 
       <h2 className="mt-10 font-serif text-xl font-semibold text-ink">Last 7 days</h2>
-      <div className="mt-4 overflow-x-auto rounded-lg border border-border">
-        <table className="w-full text-sm">
-          <thead className="bg-card text-left">
-            <tr>
-              <th className="px-4 py-2">Date (CAT)</th>
-              <th className="px-4 py-2">Unique visitors</th>
+      <div className="mt-4">
+      <TableShell>
+        <thead className="bg-card text-left">
+          <tr>
+            <th className="px-4 py-2">Date (CAT)</th>
+            <th className="px-4 py-2">Unique visitors</th>
+          </tr>
+        </thead>
+        <tbody>
+          {days.map((d) => (
+            <tr key={d.date} className="border-t border-border">
+              <td className="px-4 py-2 text-ink">{d.date}</td>
+              <td className="px-4 py-2 text-ink/70">{d.uniqueVisitors}</td>
             </tr>
-          </thead>
-          <tbody>
-            {days.map((d) => (
-              <tr key={d.date} className="border-t border-border">
-                <td className="px-4 py-2 text-ink">{d.date}</td>
-                <td className="px-4 py-2 text-ink/70">{d.uniqueVisitors}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+          ))}
+        </tbody>
+      </TableShell>
       </div>
 
       <h2 className="mt-10 font-serif text-xl font-semibold text-ink">Custom date range</h2>
@@ -153,66 +153,57 @@ export default async function AdminAnalyticsPage({
       </form>
 
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <StatCard label="Unique visitors in range" value={String(rangeUniqueVisitors)} />
-        <StatCard label="Page views in range" value={String(rangeViews)} />
+        <StatCard label="Unique visitors in range" value={rangeUniqueVisitors} />
+        <StatCard label="Page views in range" value={rangeViews} />
       </div>
 
       <div className="mt-6 grid gap-6 sm:grid-cols-2">
         <div>
           <h3 className="font-serif text-lg font-semibold text-ink">Top sources</h3>
-          <div className="mt-3 overflow-x-auto rounded-lg border border-border">
-            <table className="w-full text-sm">
-              <tbody>
-                {topSources.length === 0 && (
-                  <tr>
-                    <td className="px-4 py-4 text-center text-ink/50" colSpan={2}>
-                      No data in this range
-                    </td>
-                  </tr>
-                )}
-                {topSources.map(([source, count]) => (
-                  <tr key={source} className="border-t border-border first:border-t-0">
-                    <td className="px-4 py-2 text-ink">{source}</td>
-                    <td className="px-4 py-2 text-right text-ink/60">{count}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="mt-3">
+          <TableShell>
+            <tbody>
+              {topSources.length === 0 && (
+                <tr>
+                  <td className="px-4 py-4 text-center text-ink/50" colSpan={2}>
+                    No data in this range
+                  </td>
+                </tr>
+              )}
+              {topSources.map(([source, count]) => (
+                <tr key={source} className="border-t border-border first:border-t-0">
+                  <td className="px-4 py-2 text-ink">{source}</td>
+                  <td className="px-4 py-2 text-right text-ink/60">{count}</td>
+                </tr>
+              ))}
+            </tbody>
+          </TableShell>
           </div>
         </div>
 
         <div>
           <h3 className="font-serif text-lg font-semibold text-ink">Top pages</h3>
-          <div className="mt-3 overflow-x-auto rounded-lg border border-border">
-            <table className="w-full text-sm">
-              <tbody>
-                {topPaths.length === 0 && (
-                  <tr>
-                    <td className="px-4 py-4 text-center text-ink/50" colSpan={2}>
-                      No data in this range
-                    </td>
-                  </tr>
-                )}
-                {topPaths.map(([path, count]) => (
-                  <tr key={path} className="border-t border-border first:border-t-0">
-                    <td className="px-4 py-2 text-ink">{path}</td>
-                    <td className="px-4 py-2 text-right text-ink/60">{count}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="mt-3">
+          <TableShell>
+            <tbody>
+              {topPaths.length === 0 && (
+                <tr>
+                  <td className="px-4 py-4 text-center text-ink/50" colSpan={2}>
+                    No data in this range
+                  </td>
+                </tr>
+              )}
+              {topPaths.map(([path, count]) => (
+                <tr key={path} className="border-t border-border first:border-t-0">
+                  <td className="px-4 py-2 text-ink">{path}</td>
+                  <td className="px-4 py-2 text-right text-ink/60">{count}</td>
+                </tr>
+              ))}
+            </tbody>
+          </TableShell>
           </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-function StatCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-lg border border-border bg-card px-4 py-3 text-center">
-      <p className="font-serif text-2xl font-semibold text-ink">{value}</p>
-      <p className="mt-0.5 text-xs text-ink/50">{label}</p>
     </div>
   );
 }

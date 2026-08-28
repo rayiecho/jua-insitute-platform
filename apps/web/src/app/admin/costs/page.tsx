@@ -1,13 +1,12 @@
 import { createAdminClient } from '@/lib/supabase/admin';
+import { PageHeader, TableShell } from '@/components/admin/ui';
 
 export const dynamic = 'force-dynamic';
 
-// Section 5 Phase 5 / Section 6 — cost monitoring. Not linked from any nav
-// (no auth exists yet on this platform — see README "Architecture notes" —
-// so this deliberately isn't advertised, same posture as everything else
-// pre-auth). Costs are estimates from published vendor list prices logged by
-// apps/agent/src/cost-tracking.ts at session close, not actual invoiced
-// amounts — Groq's $0 LLM line is a free-tier stand-in, not real pricing.
+// Section 5 Phase 5 / Section 6 — cost monitoring. Costs are estimates from
+// published vendor list prices logged by apps/agent/src/cost-tracking.ts at
+// session close, not actual invoiced amounts — Groq's $0 LLM line is a
+// free-tier stand-in, not real pricing.
 const TARGET_PER_HOUR = 0.65;
 
 interface UsageRow {
@@ -67,13 +66,12 @@ export default async function CostsPage() {
 
   return (
     <div className="w-full max-w-5xl text-ink">
-      <h1 className="font-serif text-2xl font-semibold">Session cost monitoring</h1>
-      <p className="mt-2 text-sm text-ink/60">
-        Estimated from published vendor list prices at session close — not actual invoiced amounts. Target:{' '}
-        {formatUsd(TARGET_PER_HOUR)}/learner-hour (spec Section 6).
-      </p>
+      <PageHeader
+        title="Session cost monitoring"
+        description={`Estimated from published vendor list prices at session close — not actual invoiced amounts. Target: ${formatUsd(TARGET_PER_HOUR)}/learner-hour (spec Section 6).`}
+      />
 
-      <div className="mt-6 grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         <SummaryCard label="Total estimated spend" value={formatUsd(totalCost)} />
         <SummaryCard label="Total learner-hours" value={totalHours.toFixed(2)} />
         <SummaryCard
@@ -83,18 +81,18 @@ export default async function CostsPage() {
         />
       </div>
 
-      <div className="mt-10 overflow-x-auto rounded-lg border border-border">
-        <table className="w-full text-sm">
-          <thead className="bg-card text-left">
-            <tr>
-              <th className="px-4 py-2">Room</th>
-              <th className="px-4 py-2">Duration</th>
-              <th className="px-4 py-2">Cost</th>
-              <th className="px-4 py-2">$/hr</th>
-              <th className="px-4 py-2">Breakdown</th>
-            </tr>
-          </thead>
-          <tbody>
+      <div className="mt-10">
+      <TableShell>
+        <thead className="bg-card text-left">
+          <tr>
+            <th className="px-4 py-2">Room</th>
+            <th className="px-4 py-2">Duration</th>
+            <th className="px-4 py-2">Cost</th>
+            <th className="px-4 py-2">$/hr</th>
+            <th className="px-4 py-2">Breakdown</th>
+          </tr>
+        </thead>
+        <tbody>
             {sessions.map((s) => (
               <tr key={s.sessionId} className="border-t border-border align-top">
                 <td className="px-4 py-2 font-mono text-xs">{s.roomName}</td>
@@ -119,7 +117,7 @@ export default async function CostsPage() {
               </tr>
             )}
           </tbody>
-        </table>
+      </TableShell>
       </div>
     </div>
   );

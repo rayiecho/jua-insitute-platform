@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getMonthlyLiveKitUsage } from '@/lib/livekitBudget';
+import { PageHeader, Card, TableShell } from '@/components/admin/ui';
 
 const CAT_OFFSET_HOURS = 2; // Central Africa Time, UTC+2, no DST — matches /admin/analytics
 
@@ -39,16 +40,16 @@ export default async function AdminClassesPage({
 
   return (
     <div className="w-full max-w-4xl">
-      <h1 className="font-serif text-2xl font-semibold text-ink">Scheduled live classes</h1>
-      <p className="mt-1 text-sm text-ink/60">
-        Cohort classes — multiple learners join the same room at a fixed time. Times below are CAT (UTC+2).
-      </p>
+      <PageHeader
+        title="Scheduled live classes"
+        description="Cohort classes — multiple learners join the same room at a fixed time. Times below are CAT (UTC+2)."
+      />
 
       {error && (
-        <div className="mt-4 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>
+        <div className="mb-4 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>
       )}
 
-      <div className="mt-6 rounded-lg border border-border bg-card p-4">
+      <Card className="p-4">
         <p className="text-xs font-semibold uppercase tracking-wide text-ink/50">
           LiveKit free-tier usage this month (budgeted to 75% of the real cap — this platform blocks new scheduling past that)
         </p>
@@ -56,10 +57,10 @@ export default async function AdminClassesPage({
           <UsageBar label="Agent minutes" used={usage.agentMinutesUsed} cap={1000} />
           <UsageBar label="WebRTC minutes" used={usage.webrtcMinutesUsed} cap={5000} />
         </div>
-      </div>
+      </Card>
 
       <h2 className="mt-8 font-serif text-lg font-semibold text-ink">Schedule a new class</h2>
-      <form action="/api/admin/classes" method="post" className="mt-3 flex flex-wrap items-end gap-3">
+      <form action="/api/admin/classes" method="post" className="mt-3 flex flex-wrap items-end gap-3 rounded-lg border border-border bg-card p-4">
         <div>
           <label className="mb-1 block text-xs font-medium text-ink/60">Program</label>
           <select name="courseId" required className="rounded border border-border bg-card px-3 py-2 text-sm text-ink">
@@ -105,20 +106,20 @@ export default async function AdminClassesPage({
         </button>
       </form>
 
-      <h2 className="mt-10 font-serif text-lg font-semibold text-ink">Upcoming & recent classes</h2>
-      <div className="mt-3 overflow-x-auto rounded-lg border border-border">
-        <table className="w-full text-sm">
-          <thead className="bg-card text-left">
-            <tr>
-              <th className="px-4 py-2">When (CAT)</th>
-              <th className="px-4 py-2">Program</th>
-              <th className="px-4 py-2">Week</th>
-              <th className="px-4 py-2">Learners</th>
-              <th className="px-4 py-2">Status</th>
-              <th className="px-4 py-2" />
-            </tr>
-          </thead>
-          <tbody>
+      <h2 className="mt-10 font-serif text-lg font-semibold text-ink">Upcoming &amp; recent classes</h2>
+      <div className="mt-3">
+      <TableShell>
+        <thead className="bg-card text-left">
+          <tr>
+            <th className="px-4 py-2">When (CAT)</th>
+            <th className="px-4 py-2">Program</th>
+            <th className="px-4 py-2">Week</th>
+            <th className="px-4 py-2">Learners</th>
+            <th className="px-4 py-2">Status</th>
+            <th className="px-4 py-2" />
+          </tr>
+        </thead>
+        <tbody>
             {(sessions ?? []).map((s) => {
               const course = Array.isArray(s.course) ? s.course[0] : s.course;
               const week = Array.isArray(s.week) ? s.week[0] : s.week;
@@ -145,7 +146,7 @@ export default async function AdminClassesPage({
               </tr>
             )}
           </tbody>
-        </table>
+      </TableShell>
       </div>
     </div>
   );

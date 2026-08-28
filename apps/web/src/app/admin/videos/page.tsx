@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { VideoAdminTable } from '@/components/admin/VideoAdminTable';
+import { PageHeader } from '@/components/admin/ui';
 
 export default async function AdminVideosPage() {
   const supabase = createAdminClient();
@@ -24,12 +25,11 @@ export default async function AdminVideosPage() {
 
   return (
     <div className="w-full max-w-5xl">
-      <h1 className="font-serif text-2xl font-semibold text-ink">Lesson Videos</h1>
-      <p className="mt-1 text-sm text-ink/60">
-        Generate narrated lesson videos and post them to YouTube. Rendering runs on a separate service and can take a
-        few minutes — this page polls for completion.
-      </p>
-      <div className="mt-6">
+      <PageHeader
+        title="Lesson Videos"
+        description="Generate narrated lesson videos and post them to YouTube. Rendering runs through AfriVid Studio's API — this page polls for completion."
+      />
+      <div>
         <VideoAdminTable rows={rows} />
       </div>
     </div>

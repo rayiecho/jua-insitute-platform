@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin';
+import { PageHeader, TableShell } from '@/components/admin/ui';
 
 export default async function AdminUsersPage() {
   const supabase = createAdminClient();
@@ -19,23 +20,21 @@ export default async function AdminUsersPage() {
 
   return (
     <div className="w-full max-w-5xl">
-      <h1 className="font-serif text-2xl font-semibold text-ink">Users</h1>
-      <p className="mt-1 text-sm text-ink/60">
-        Someone is a "registered user" once they enroll in a program — accounts with no enrollment yet verified an
-        email but haven't started anything.
-      </p>
+      <PageHeader
+        title="Users"
+        description={`Someone is a "registered user" once they enroll in a program — accounts with no enrollment yet verified an email but haven't started anything.`}
+      />
 
-      <div className="mt-6 overflow-x-auto rounded-lg border border-border">
-        <table className="w-full text-sm">
-          <thead className="bg-card text-left">
-            <tr>
-              <th className="px-4 py-2">Name</th>
-              <th className="px-4 py-2">Email</th>
-              <th className="px-4 py-2">Programs</th>
-              <th className="px-4 py-2">Joined</th>
-            </tr>
-          </thead>
-          <tbody>
+      <TableShell>
+        <thead className="bg-card text-left">
+          <tr>
+            <th className="px-4 py-2">Name</th>
+            <th className="px-4 py-2">Email</th>
+            <th className="px-4 py-2">Programs</th>
+            <th className="px-4 py-2">Joined</th>
+          </tr>
+        </thead>
+        <tbody>
             {(users ?? []).map((u) => {
               const programs = coursesByUser.get(u.id) ?? [];
               return (
@@ -63,8 +62,7 @@ export default async function AdminUsersPage() {
               </tr>
             )}
           </tbody>
-        </table>
-      </div>
+      </TableShell>
     </div>
   );
 }

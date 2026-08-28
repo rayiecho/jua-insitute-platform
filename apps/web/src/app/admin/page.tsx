@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { Card, PageHeader, Badge } from '@/components/admin/ui';
 
 export default async function AdminOverviewPage() {
   const supabase = createAdminClient();
@@ -21,9 +22,9 @@ export default async function AdminOverviewPage() {
 
   return (
     <div className="w-full max-w-5xl">
-      <h1 className="font-serif text-2xl font-semibold text-ink">Overview</h1>
+      <PageHeader title="Overview" />
 
-      <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <Stat label="Registered users" value={registeredCount ?? 0} href="/admin/users" />
         <Stat label="Enrollments" value={enrollments.count ?? 0} href="/admin/enrollments" />
         <Stat label="Waitlist signups" value={waitlist.count ?? 0} href="/admin/waitlist" />
@@ -32,14 +33,14 @@ export default async function AdminOverviewPage() {
 
       <div className="mt-10">
         <h2 className="font-serif text-lg font-semibold text-ink">Programs</h2>
-        <div className="mt-3 divide-y divide-border rounded-lg border border-border bg-card">
+        <Card className="mt-3 divide-y divide-border p-0">
           {(courses.data ?? []).map((c) => (
             <div key={c.id} className="flex items-center justify-between px-5 py-3">
               <span className="font-medium text-ink">{c.title}</span>
-              <span className="text-xs font-semibold uppercase tracking-wide text-ink/40">{c.status}</span>
+              <Badge tone={c.status === 'live' ? 'green' : 'neutral'}>{c.status}</Badge>
             </div>
           ))}
-        </div>
+        </Card>
       </div>
 
       <p className="mt-10 text-xs text-ink/40">
@@ -51,7 +52,7 @@ export default async function AdminOverviewPage() {
 
 function Stat({ label, value, href }: { label: string; value: number; href: string }) {
   return (
-    <Link href={href} className="rounded-lg border border-border bg-card p-4 hover:border-gold">
+    <Link href={href} className="rounded-lg border border-border bg-card p-4 transition-colors hover:border-gold">
       <p className="text-xs uppercase tracking-wide text-ink/60">{label}</p>
       <p className="mt-1 font-serif text-2xl font-semibold text-ink">{value}</p>
     </Link>

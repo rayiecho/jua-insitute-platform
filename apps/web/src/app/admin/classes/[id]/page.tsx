@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { TableShell } from '@/components/admin/ui';
 
 const CAT_OFFSET_HOURS = 2;
 
@@ -60,9 +61,9 @@ export default async function AdminClassDetailPage({
       )}
 
       <h2 className="mt-8 font-serif text-lg font-semibold text-ink">Assigned learners ({assigned?.length ?? 0})</h2>
-      <div className="mt-3 overflow-x-auto rounded-lg border border-border">
-        <table className="w-full text-sm">
-          <tbody>
+      <div className="mt-3">
+      <TableShell>
+        <tbody>
             {(assigned ?? []).map((a) => {
               const learner = Array.isArray(a.learner) ? a.learner[0] : a.learner;
               return (
@@ -90,8 +91,8 @@ export default async function AdminClassDetailPage({
                 </td>
               </tr>
             )}
-          </tbody>
-        </table>
+        </tbody>
+      </TableShell>
       </div>
 
       <h2 className="mt-8 font-serif text-lg font-semibold text-ink">Add learners enrolled in {course?.title}</h2>
@@ -99,25 +100,23 @@ export default async function AdminClassDetailPage({
         <p className="mt-3 text-sm text-ink/50">Everyone enrolled in this program is already assigned.</p>
       ) : (
         <form action={`/api/admin/classes/${id}/enrollments`} method="post" className="mt-3">
-          <div className="overflow-x-auto rounded-lg border border-border">
-            <table className="w-full text-sm">
-              <tbody>
-                {candidates.map((c) => (
-                  <tr key={c.id} className="border-t border-border first:border-t-0">
-                    <td className="px-4 py-2">
-                      <label className="flex items-center gap-2">
-                        <input type="checkbox" name="userIds" value={c.id} />
-                        <span className="text-ink">
-                          {c.first_name} {c.last_name}
-                        </span>
-                        <span className="text-ink/50">{c.email}</span>
-                      </label>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <TableShell>
+            <tbody>
+              {candidates.map((c) => (
+                <tr key={c.id} className="border-t border-border first:border-t-0">
+                  <td className="px-4 py-2">
+                    <label className="flex items-center gap-2">
+                      <input type="checkbox" name="userIds" value={c.id} />
+                      <span className="text-ink">
+                        {c.first_name} {c.last_name}
+                      </span>
+                      <span className="text-ink/50">{c.email}</span>
+                    </label>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </TableShell>
           <button type="submit" className="mt-3 rounded bg-gold px-4 py-2 text-sm font-semibold text-ink">
             Add selected
           </button>

@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin';
+import { PageHeader, TableShell } from '@/components/admin/ui';
 
 const STATUS_STYLE: Record<string, string> = {
   in_progress: 'text-ink/50',
@@ -19,21 +20,19 @@ export default async function AdminSubmissionsPage() {
 
   return (
     <div className="w-full max-w-5xl">
-      <h1 className="font-serif text-2xl font-semibold text-ink">Submissions</h1>
-      <p className="mt-1 text-sm text-ink/60">Most recent 200 assignment submissions, across all programs.</p>
+      <PageHeader title="Submissions" description="Most recent 200 assignment submissions, across all programs." />
 
-      <div className="mt-6 overflow-x-auto rounded-lg border border-border">
-        <table className="w-full text-sm">
-          <thead className="bg-card text-left">
-            <tr>
-              <th className="px-4 py-2">Learner</th>
-              <th className="px-4 py-2">Assignment</th>
-              <th className="px-4 py-2">Status</th>
-              <th className="px-4 py-2">Score</th>
-              <th className="px-4 py-2">Updated</th>
-            </tr>
-          </thead>
-          <tbody>
+      <TableShell>
+        <thead className="bg-card text-left">
+          <tr>
+            <th className="px-4 py-2">Learner</th>
+            <th className="px-4 py-2">Assignment</th>
+            <th className="px-4 py-2">Status</th>
+            <th className="px-4 py-2">Score</th>
+            <th className="px-4 py-2">Updated</th>
+          </tr>
+        </thead>
+        <tbody>
             {(submissions ?? []).map((s) => {
               const learner = Array.isArray(s.learner) ? s.learner[0] : s.learner;
               const assignment = Array.isArray(s.assignment) ? s.assignment[0] : s.assignment;
@@ -61,8 +60,7 @@ export default async function AdminSubmissionsPage() {
               </tr>
             )}
           </tbody>
-        </table>
-      </div>
+      </TableShell>
     </div>
   );
 }

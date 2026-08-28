@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin';
+import { PageHeader, TableShell, Badge } from '@/components/admin/ui';
 
 export default async function AdminApplicationsPage() {
   const supabase = createAdminClient();
@@ -12,27 +13,25 @@ export default async function AdminApplicationsPage() {
 
   return (
     <div className="w-full max-w-6xl">
-      <h1 className="font-serif text-2xl font-semibold text-ink">Enrollment applications</h1>
-      <p className="mt-1 text-sm text-ink/60">
-        Submitted the moment someone applies to a program — &quot;verified&quot; means they&apos;ve confirmed their
-        email and their enrollment is live.
-      </p>
+      <PageHeader
+        title="Enrollment applications"
+        description={`Submitted the moment someone applies to a program — "verified" means they've confirmed their email and their enrollment is live.`}
+      />
 
-      <div className="mt-6 overflow-x-auto rounded-lg border border-border">
-        <table className="w-full text-sm">
-          <thead className="bg-card text-left">
-            <tr>
-              <th className="px-4 py-2">Name</th>
-              <th className="px-4 py-2">Email</th>
-              <th className="px-4 py-2">Program</th>
-              <th className="px-4 py-2">Education</th>
-              <th className="px-4 py-2">Commitment</th>
-              <th className="px-4 py-2">Interests</th>
-              <th className="px-4 py-2">Status</th>
-              <th className="px-4 py-2">Applied</th>
-            </tr>
-          </thead>
-          <tbody>
+      <TableShell>
+        <thead className="bg-card text-left">
+          <tr>
+            <th className="px-4 py-2">Name</th>
+            <th className="px-4 py-2">Email</th>
+            <th className="px-4 py-2">Program</th>
+            <th className="px-4 py-2">Education</th>
+            <th className="px-4 py-2">Commitment</th>
+            <th className="px-4 py-2">Interests</th>
+            <th className="px-4 py-2">Status</th>
+            <th className="px-4 py-2">Applied</th>
+          </tr>
+        </thead>
+        <tbody>
             {(applications ?? []).map((a) => {
               const course = Array.isArray(a.course) ? a.course[0] : a.course;
               return (
@@ -46,13 +45,7 @@ export default async function AdminApplicationsPage() {
                   <td className="px-4 py-2 text-ink/70">{a.commitment_hours}</td>
                   <td className="px-4 py-2 text-ink/70">{a.interests ?? '—'}</td>
                   <td className="px-4 py-2">
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                        a.status === 'verified' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'
-                      }`}
-                    >
-                      {a.status}
-                    </span>
+                    <Badge tone={a.status === 'verified' ? 'green' : 'amber'}>{a.status}</Badge>
                   </td>
                   <td className="px-4 py-2 text-xs text-ink/50">{new Date(a.created_at).toLocaleDateString()}</td>
                 </tr>
@@ -66,8 +59,7 @@ export default async function AdminApplicationsPage() {
               </tr>
             )}
           </tbody>
-        </table>
-      </div>
+      </TableShell>
     </div>
   );
 }

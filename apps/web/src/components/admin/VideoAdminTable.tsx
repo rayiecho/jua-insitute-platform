@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { TableShell } from './ui';
 
 interface Row {
   id: string;
@@ -54,40 +55,51 @@ export function VideoAdminTable({ rows: initialRows }: { rows: Row[] }) {
   const youtube = useJobPoller();
 
   async function handleGenerate(slug: string) {
-    const res = await fetch('/api/admin/videos/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slug }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      alert(data.error ?? 'Failed to start generation');
-      return;
+    try {
+      const res = await fetch('/api/admin/videos/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error ?? 'Failed to start generation');
+        return;
+      }
+      generate.start(slug, data.jobId, (resultUrl) => {
+        setRows((rs) => rs.map((r) => (r.slug === slug ? { ...r, videoUrl: resultUrl ?? r.videoUrl } : r)));
+      });
+    } catch (err) {
+      // A network failure or a non-JSON response (worker cold-starting,
+      // an edge error page) previously threw here with no try/catch and no
+      // .catch() on the click handler — an unhandled rejection the button
+      // silently swallowed. Surface it the same way the handled case is.
+      alert(err instanceof Error ? err.message : 'Failed to start generation');
     }
-    generate.start(slug, data.jobId, (resultUrl) => {
-      setRows((rs) => rs.map((r) => (r.slug === slug ? { ...r, videoUrl: resultUrl ?? r.videoUrl } : r)));
-    });
   }
 
   async function handlePostYouTube(slug: string) {
-    const res = await fetch('/api/admin/videos/post-youtube', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slug }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      alert(data.error ?? 'Failed to start YouTube upload');
-      return;
+    try {
+      const res = await fetch('/api/admin/videos/post-youtube', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error ?? 'Failed to start YouTube upload');
+        return;
+      }
+      youtube.start(slug, data.jobId, (resultUrl) => {
+        setRows((rs) => rs.map((r) => (r.slug === slug ? { ...r, youtubeUrl: resultUrl ?? r.youtubeUrl } : r)));
+      });
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to start YouTube upload');
     }
-    youtube.start(slug, data.jobId, (resultUrl) => {
-      setRows((rs) => rs.map((r) => (r.slug === slug ? { ...r, youtubeUrl: resultUrl ?? r.youtubeUrl } : r)));
-    });
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-border">
-      <table className="w-full text-sm">
+    <TableShell>
         <thead className="bg-card text-left">
           <tr>
             <th className="px-4 py-2">Lesson</th>
@@ -153,7 +165,6 @@ export function VideoAdminTable({ rows: initialRows }: { rows: Row[] }) {
             </tr>
           )}
         </tbody>
-      </table>
-    </div>
+    </TableShell>
   );
 }

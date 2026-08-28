@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin';
+import { PageHeader, TableShell } from '@/components/admin/ui';
 
 export default async function AdminWaitlistPage() {
   const supabase = createAdminClient();
@@ -10,18 +11,17 @@ export default async function AdminWaitlistPage() {
 
   return (
     <div className="w-full max-w-5xl">
-      <h1 className="font-serif text-2xl font-semibold text-ink">Waitlist</h1>
+      <PageHeader title="Waitlist" />
 
-      <div className="mt-6 overflow-x-auto rounded-lg border border-border">
-        <table className="w-full text-sm">
-          <thead className="bg-card text-left">
-            <tr>
-              <th className="px-4 py-2">Email</th>
-              <th className="px-4 py-2">Program</th>
-              <th className="px-4 py-2">Joined</th>
-            </tr>
-          </thead>
-          <tbody>
+      <TableShell>
+        <thead className="bg-card text-left">
+          <tr>
+            <th className="px-4 py-2">Email</th>
+            <th className="px-4 py-2">Program</th>
+            <th className="px-4 py-2">Joined</th>
+          </tr>
+        </thead>
+        <tbody>
             {(signups ?? []).map((s) => {
               const course = Array.isArray(s.course) ? s.course[0] : s.course;
               return (
@@ -40,8 +40,7 @@ export default async function AdminWaitlistPage() {
               </tr>
             )}
           </tbody>
-        </table>
-      </div>
+      </TableShell>
     </div>
   );
 }

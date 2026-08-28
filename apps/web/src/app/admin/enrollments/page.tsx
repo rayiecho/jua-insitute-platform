@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin';
+import { PageHeader, TableShell } from '@/components/admin/ui';
 
 export default async function AdminEnrollmentsPage() {
   const supabase = createAdminClient();
@@ -12,19 +13,18 @@ export default async function AdminEnrollmentsPage() {
 
   return (
     <div className="w-full max-w-5xl">
-      <h1 className="font-serif text-2xl font-semibold text-ink">Enrollments</h1>
+      <PageHeader title="Enrollments" />
 
-      <div className="mt-6 overflow-x-auto rounded-lg border border-border">
-        <table className="w-full text-sm">
-          <thead className="bg-card text-left">
-            <tr>
-              <th className="px-4 py-2">Learner</th>
-              <th className="px-4 py-2">Program</th>
-              <th className="px-4 py-2">Enrolled</th>
-              <th className="px-4 py-2">Last active</th>
-            </tr>
-          </thead>
-          <tbody>
+      <TableShell>
+        <thead className="bg-card text-left">
+          <tr>
+            <th className="px-4 py-2">Learner</th>
+            <th className="px-4 py-2">Program</th>
+            <th className="px-4 py-2">Enrolled</th>
+            <th className="px-4 py-2">Last active</th>
+          </tr>
+        </thead>
+        <tbody>
             {(enrollments ?? []).map((e) => {
               const learner = Array.isArray(e.learner) ? e.learner[0] : e.learner;
               const course = Array.isArray(e.course) ? e.course[0] : e.course;
@@ -50,8 +50,7 @@ export default async function AdminEnrollmentsPage() {
               </tr>
             )}
           </tbody>
-        </table>
-      </div>
+      </TableShell>
     </div>
   );
 }
