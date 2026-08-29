@@ -54,45 +54,37 @@ export default async function Home() {
     weeks: weeksByCourse.get(c.id) ?? [],
   }));
 
-  // Real, computed numbers — not hardcoded — so this stays accurate as
-  // programs and content grow.
-  const liveProgramCount = programs.filter((p) => p.status === 'live').length;
-  const totalLessons = programs.reduce((sum, p) => sum + p.lessonCount, 0);
-  const totalWeeks = programs.reduce((sum, p) => sum + p.weeks.filter((w) => !w.isFinal).length, 0);
-
   return (
     <>
       <SiteHeader />
       <main className="flex-1">
-        {/* Hero — the problem */}
-        <section>
-          <Reveal>
-            <div className="relative h-[60vh] min-h-[420px] w-full">
-              <Image
-                src="https://pub-aefea01aecc44a379842b04ac827cd6a.r2.dev/output/brandimg_1787926154.jpg"
-                alt="Jua Institute"
-                fill
-                priority
-                className="object-cover"
-              />
-            </div>
-          </Reveal>
-          <div className="mx-auto w-full max-w-3xl px-6 pt-16 pb-16 text-center">
+        {/* Hero — problem statement laid directly over the photo */}
+        <section className="relative h-[75vh] min-h-[560px] w-full">
+          <Image
+            src="https://pub-aefea01aecc44a379842b04ac827cd6a.r2.dev/output/brandimg_1787926154.jpg"
+            alt="Jua Institute"
+            fill
+            priority
+            className="object-cover"
+          />
+          {/* Darker than a typical scrim on purpose — the source photo has
+              its own baked-in "JUA INSTITUTE" title/caption bars (from its
+              original use as a video thumbnail) that would otherwise
+              compete with the real overlaid headline. */}
+          <div className="absolute inset-0 bg-black/78" />
+          <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center">
             <Reveal>
-              <span className="text-xs font-semibold uppercase tracking-[0.2em] text-tan">The problem</span>
-            </Reveal>
-            <Reveal delay={80}>
-              <h1 className="mt-3 font-serif text-4xl font-semibold text-ink sm:text-5xl">
-                A grade says &ldquo;passed.&rdquo; It doesn&apos;t say you can do it.
+              <h1 className="max-w-2xl font-serif text-4xl font-semibold text-white sm:text-5xl">
+                A grade says you passed. It doesn&rsquo;t say what you can actually do.
               </h1>
             </Reveal>
-            <Reveal delay={200}>
-              <p className="mx-auto mt-5 max-w-xl text-lg text-ink/70">
-                Most Kenyan students finish school or university with no reliable way to prove what they actually
-                learned — and no clear next step either way.
+            <Reveal delay={140}>
+              <p className="mx-auto mt-5 max-w-xl text-lg text-white/80">
+                Every year, hundreds of thousands of students finish an exam or a course with a mark, no clear next
+                step, and no way to show what was actually learned.
               </p>
             </Reveal>
-            <Reveal delay={320}>
+            <Reveal delay={280}>
               <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
                 <Link
                   href="/programs"
@@ -100,44 +92,29 @@ export default async function Home() {
                 >
                   Explore programs
                 </Link>
-                <TalkToTutorButton className="rounded border border-border px-6 py-3 text-sm font-semibold text-ink hover:bg-card" />
+                <TalkToTutorButton className="rounded border border-white/40 px-6 py-3 text-sm font-semibold text-white hover:bg-white/10" />
               </div>
             </Reveal>
           </div>
         </section>
 
-        {/* Real numbers, mid-page */}
-        <section className="border-y border-border bg-card">
-          <div className="mx-auto grid w-full max-w-5xl grid-cols-2 gap-4 px-6 py-14 sm:grid-cols-4">
-            <Reveal>
-              <StatTile value={String(liveProgramCount)} label="Live programs" />
-            </Reveal>
-            <Reveal delay={80}>
-              <StatTile value={String(totalLessons)} label="Real lessons" />
-            </Reveal>
-            <Reveal delay={160}>
-              <StatTile value={String(totalWeeks)} label="Weeks of curriculum" />
-            </Reveal>
-            <Reveal delay={240}>
-              <StatTile value="2×" label="Live tutor sessions / week" />
-            </Reveal>
-          </div>
-        </section>
+        {/* Reserved for platform numbers once they're worth showing */}
+        <section className="h-24 border-y border-border bg-card sm:h-28" />
 
-        {/* The solution */}
+        {/* Bridge statement + approach */}
         <section className="mx-auto w-full max-w-2xl px-6 py-16 text-center">
           <Reveal>
-            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-tan">The approach</span>
+            <p className="font-serif text-2xl font-semibold text-ink sm:text-3xl">
+              Kenya has the highest AI adoption in the world — and no structure to turn that into provable skill. Jua
+              Institute is that structure.
+            </p>
           </Reveal>
-          <Reveal delay={80}>
-            <h2 className="mt-3 font-serif text-3xl font-semibold text-ink sm:text-4xl">
-              Built to prove skill, not just pass time.
-            </h2>
-          </Reveal>
-          <Reveal delay={160}>
-            <p className="mx-auto mt-5 text-lg text-ink/70">
-              A live tutor that actually remembers you. A path you can&apos;t skip ahead in without proving mastery
-              first. And a portfolio of real work — not a certificate asking someone to take your word for it.
+          <Reveal delay={140}>
+            <p className="mx-auto mt-6 text-lg leading-relaxed text-ink/70">
+              A tutor that already knows what you built last session, not a chatbot starting from zero every time.
+              A curriculum you can&rsquo;t get ahead of without actually mastering the last step, closing off the
+              shortcut generative AI usually offers. And a portfolio of finished, graded work that speaks for
+              itself, instead of a transcript asking someone to take your word for it.
             </p>
           </Reveal>
         </section>
@@ -160,7 +137,7 @@ export default async function Home() {
               </div>
               <h3 className="mt-4 font-serif text-xl font-semibold text-ink">A path, not a playlist</h3>
               <p className="mt-2 text-sm leading-relaxed text-ink/70">
-                You don&apos;t move on until the last skill is genuinely mastered — verified by real assignments, not
+                You don&rsquo;t move on until the last skill is genuinely mastered — checked through graded work, not
                 a watched video.
               </p>
             </Reveal>
@@ -170,7 +147,7 @@ export default async function Home() {
               </div>
               <h3 className="mt-4 font-serif text-xl font-semibold text-ink">Proof that outlasts a transcript</h3>
               <p className="mt-2 text-sm leading-relaxed text-ink/70">
-                Every learner leaves with a real, verifiable record of what they built — not just a grade.
+                Every learner leaves with a verifiable record of what they built — not just a grade.
               </p>
             </Reveal>
           </div>
@@ -212,15 +189,6 @@ export default async function Home() {
         </section>
       </main>
     </>
-  );
-}
-
-function StatTile({ value, label }: { value: string; label: string }) {
-  return (
-    <div className="text-center">
-      <p className="font-serif text-3xl font-semibold text-ink sm:text-4xl">{value}</p>
-      <p className="mt-1 text-xs font-medium uppercase tracking-wide text-ink/50 sm:text-sm">{label}</p>
-    </div>
   );
 }
 

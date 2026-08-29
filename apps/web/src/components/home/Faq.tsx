@@ -17,7 +17,7 @@ const FAQS = [
   },
   {
     q: 'What do I get instead of a certificate?',
-    a: 'A real, verifiable portfolio — actual projects and graded work, not just a line that says you passed.',
+    a: 'A verifiable portfolio — actual projects and graded work, not just a line that says you passed.',
   },
   {
     q: 'How much time does it take each week?',
