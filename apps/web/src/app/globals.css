@@ -86,6 +86,29 @@ button:not(:disabled) {
   }
 }
 
+/* Footer wave band — two layered paths, each drawn twice back-to-back at
+   200% width. Scrolling the outer wrapper by exactly -50% loops seamlessly;
+   a separate vertical bob on the inner SVG composes with that (nested
+   transforms, not the same property fighting itself) so the whole thing
+   reads as genuinely alive rather than a flat printed pattern. */
+@keyframes wave-scroll-x {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+@keyframes wave-bob-y {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-14px);
+  }
+}
+
 /* Live-class reactions (TutorSessionUI) — rises and fades over ~2s. */
 @keyframes float-up {
   0% {

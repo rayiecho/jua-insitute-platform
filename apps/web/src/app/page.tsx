@@ -5,6 +5,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { TalkToTutorButton } from '@/components/programs/TalkToTutorButton';
 import { ProgramCard } from '@/components/programs/ProgramCard';
+import { Faq } from '@/components/home/Faq';
 import { Reveal } from '@/components/layout/Reveal';
 
 // Without this, Next.js prerenders the program teaser once at build time and
@@ -53,11 +54,17 @@ export default async function Home() {
     weeks: weeksByCourse.get(c.id) ?? [],
   }));
 
+  // Real, computed numbers — not hardcoded — so this stays accurate as
+  // programs and content grow.
+  const liveProgramCount = programs.filter((p) => p.status === 'live').length;
+  const totalLessons = programs.reduce((sum, p) => sum + p.lessonCount, 0);
+  const totalWeeks = programs.reduce((sum, p) => sum + p.weeks.filter((w) => !w.isFinal).length, 0);
+
   return (
     <>
       <SiteHeader />
       <main className="flex-1">
-        {/* Hero */}
+        {/* Hero — the problem */}
         <section>
           <Reveal>
             <div className="relative h-[60vh] min-h-[420px] w-full">
@@ -72,17 +79,20 @@ export default async function Home() {
           </Reveal>
           <div className="mx-auto w-full max-w-3xl px-6 pt-16 pb-16 text-center">
             <Reveal>
-              <h1 className="font-serif text-4xl font-semibold text-ink sm:text-5xl">
-                A real class. A tutor who never forgets where you are.
+              <span className="text-xs font-semibold uppercase tracking-[0.2em] text-tan">The problem</span>
+            </Reveal>
+            <Reveal delay={80}>
+              <h1 className="mt-3 font-serif text-4xl font-semibold text-ink sm:text-5xl">
+                A grade says &ldquo;passed.&rdquo; It doesn&apos;t say you can do it.
               </h1>
             </Reveal>
-            <Reveal delay={120}>
+            <Reveal delay={200}>
               <p className="mx-auto mt-5 max-w-xl text-lg text-ink/70">
-                Jua Institute pairs project-based, self-paced programs with a live 1-on-1 AI tutor —
-                the same one every session, who already knows what you were building last time.
+                Most Kenyan students finish school or university with no reliable way to prove what they actually
+                learned — and no clear next step either way.
               </p>
             </Reveal>
-            <Reveal delay={240}>
+            <Reveal delay={320}>
               <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
                 <Link
                   href="/programs"
@@ -96,37 +106,77 @@ export default async function Home() {
           </div>
         </section>
 
+        {/* Real numbers, mid-page */}
+        <section className="border-y border-border bg-card">
+          <div className="mx-auto grid w-full max-w-5xl grid-cols-2 gap-4 px-6 py-14 sm:grid-cols-4">
+            <Reveal>
+              <StatTile value={String(liveProgramCount)} label="Live programs" />
+            </Reveal>
+            <Reveal delay={80}>
+              <StatTile value={String(totalLessons)} label="Real lessons" />
+            </Reveal>
+            <Reveal delay={160}>
+              <StatTile value={String(totalWeeks)} label="Weeks of curriculum" />
+            </Reveal>
+            <Reveal delay={240}>
+              <StatTile value="2×" label="Live tutor sessions / week" />
+            </Reveal>
+          </div>
+        </section>
+
+        {/* The solution */}
+        <section className="mx-auto w-full max-w-2xl px-6 py-16 text-center">
+          <Reveal>
+            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-tan">The approach</span>
+          </Reveal>
+          <Reveal delay={80}>
+            <h2 className="mt-3 font-serif text-3xl font-semibold text-ink sm:text-4xl">
+              Built to prove skill, not just pass time.
+            </h2>
+          </Reveal>
+          <Reveal delay={160}>
+            <p className="mx-auto mt-5 text-lg text-ink/70">
+              A live tutor that actually remembers you. A path you can&apos;t skip ahead in without proving mastery
+              first. And a portfolio of real work — not a certificate asking someone to take your word for it.
+            </p>
+          </Reveal>
+        </section>
+
         {/* How it works */}
         <section className="border-y border-border bg-card">
-          <div className="mx-auto grid w-full max-w-5xl gap-10 px-6 py-16 sm:grid-cols-2">
+          <div className="mx-auto grid w-full max-w-5xl gap-10 px-6 py-16 sm:grid-cols-3">
             <Reveal>
               <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gold/15 text-gold-dark">
-                <PlatformIcon />
+                <TutorIcon />
               </div>
-              <span className="mt-4 block text-xs font-semibold uppercase tracking-wide text-tan">The platform</span>
-              <h2 className="mt-1 font-serif text-2xl font-semibold text-ink">Learn at your own pace</h2>
-              <p className="mt-3 text-ink/70">
-                Real lessons, seeded videos, and a live code sandbox — not slides. Work through a
-                program on your own schedule, submit assignments, and get graded automatically:
-                syntax errors come back instantly, real logic gets a full review.
+              <h3 className="mt-4 font-serif text-xl font-semibold text-ink">A tutor that remembers you</h3>
+              <p className="mt-2 text-sm leading-relaxed text-ink/70">
+                Live, voice-based, one-on-one or small cohort — picking up exactly where your last session left off.
               </p>
             </Reveal>
-            <Reveal delay={150}>
+            <Reveal delay={120}>
               <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gold/15 text-gold-dark">
-                <LiveClassIcon />
+                <PathIcon />
               </div>
-              <span className="mt-4 block text-xs font-semibold uppercase tracking-wide text-tan">The live class</span>
-              <h2 className="mt-1 font-serif text-2xl font-semibold text-ink">Then talk it through</h2>
-              <p className="mt-3 text-ink/70">
-                Jump into a live voice session with your tutor anytime. It already knows your
-                current lesson and reacts to your code as you write it — no re-explaining where
-                you left off.
+              <h3 className="mt-4 font-serif text-xl font-semibold text-ink">A path, not a playlist</h3>
+              <p className="mt-2 text-sm leading-relaxed text-ink/70">
+                You don&apos;t move on until the last skill is genuinely mastered — verified by real assignments, not
+                a watched video.
+              </p>
+            </Reveal>
+            <Reveal delay={240}>
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gold/15 text-gold-dark">
+                <ProofIcon />
+              </div>
+              <h3 className="mt-4 font-serif text-xl font-semibold text-ink">Proof that outlasts a transcript</h3>
+              <p className="mt-2 text-sm leading-relaxed text-ink/70">
+                Every learner leaves with a real, verifiable record of what they built — not just a grade.
               </p>
             </Reveal>
           </div>
         </section>
 
-        {/* Programs teaser */}
+        {/* Programs */}
         {programs.length > 0 && (
           <section className="mx-auto w-full max-w-6xl px-4 py-16 sm:px-6 md:px-8">
             <Reveal>
@@ -146,24 +196,59 @@ export default async function Home() {
             </div>
           </section>
         )}
+
+        {/* FAQ */}
+        <section className="border-t border-border bg-card px-6 py-16">
+          <Reveal>
+            <h2 className="text-center font-serif text-2xl font-semibold text-ink sm:text-3xl">
+              Frequently asked questions
+            </h2>
+          </Reveal>
+          <div className="mt-8">
+            <Reveal delay={80}>
+              <Faq />
+            </Reveal>
+          </div>
+        </section>
       </main>
     </>
   );
 }
 
-function PlatformIcon() {
+function StatTile({ value, label }: { value: string; label: string }) {
   return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M9 8l-4 4 4 4M15 8l4 4-4 4" />
-    </svg>
+    <div className="text-center">
+      <p className="font-serif text-3xl font-semibold text-ink sm:text-4xl">{value}</p>
+      <p className="mt-1 text-xs font-medium uppercase tracking-wide text-ink/50 sm:text-sm">{label}</p>
+    </div>
   );
 }
 
-function LiveClassIcon() {
+function TutorIcon() {
   return (
     <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
       <rect x="3" y="6" width="13" height="12" rx="2" strokeLinecap="round" strokeLinejoin="round" />
       <path strokeLinecap="round" strokeLinejoin="round" d="M16 10.5l5-3v9l-5-3" />
+    </svg>
+  );
+}
+
+function PathIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
+      <circle cx="5" cy="6" r="2" />
+      <circle cx="12" cy="12" r="2" />
+      <circle cx="19" cy="18" r="2" />
+      <path strokeLinecap="round" d="M6.5 7.5L10.5 10.5M13.5 13.5L17.5 16.5" />
+    </svg>
+  );
+}
+
+function ProofIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4" />
+      <circle cx="12" cy="12" r="9" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
